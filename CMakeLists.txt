@@ -25,7 +25,8 @@ target_include_directories(AdHocServer PRIVATE
 target_compile_features(AdHocServer PRIVATE cxx_std_17)
 
 find_package(blobify REQUIRED)
-target_link_libraries(AdHocServer PRIVATE blobify::blobify)
+find_package(SQLite3 REQUIRED)
+target_link_libraries(AdHocServer PRIVATE blobify::blobify SQLite::SQLite3)
 
 # ---- Install ----
 
