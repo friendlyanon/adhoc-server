@@ -29,31 +29,10 @@ target_link_libraries(AdHocServer PRIVATE blobify::blobify)
 
 # ---- Install ----
 
-include(CMakePackageConfigHelpers)
+include(CPack)
 include(GNUInstallDirs)
 
 install(TARGETS AdHocServer
-        EXPORT AdHocServerTargets
         RUNTIME #
         DESTINATION "${CMAKE_INSTALL_BINDIR}"
         COMPONENT adhoc-server_Runtime)
-
-write_basic_package_version_file(
-        adhoc-server-config-version.cmake
-        COMPATIBILITY SameMajorVersion)
-
-set(adhoc-server_install_cmakedir
-        "${CMAKE_INSTALL_LIBDIR}/cmake/adhoc-server-${PROJECT_VERSION}")
-
-install(FILES "${PROJECT_BINARY_DIR}/adhoc-server-config-version.cmake"
-        DESTINATION "${adhoc-server_install_cmakedir}"
-        COMPONENT adhoc-server_Package)
-
-install(EXPORT AdHocServerTargets
-        FILE adhoc-server-config.cmake
-        DESTINATION "${adhoc-server_install_cmakedir}"
-        COMPONENT adhoc-server_Package)
-
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-  include(CPack)
-endif()
