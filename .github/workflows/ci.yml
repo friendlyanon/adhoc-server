@@ -9,10 +9,6 @@ on:
     branches:
       - master
 
-env:
-  INSTALL_PREFIX: install
-  BUILD_TYPE: Release
-
 jobs:
   tests:
     if: >-
@@ -30,15 +26,16 @@ jobs:
 
       - uses: actions/cache@v2
         with:
-          path: ${{ env.INSTALL_PREFIX }}
-          key: ${{ hashFiles('cmake/install-dependencies.cmake') }}
+          path: .ubpm
+          key: ${{ hashFiles('dependencies.cmake') }}
 
-      - name: Install dependencies
-        run: cmake -P cmake/install-dependencies.cmake
+      - uses: friendlyanon/ubpm@pre-v1
+        id: ubpm
 
       - name: Configure
-        run: cmake -S . -B build -D CMAKE_INSTALL_PREFIX=$INSTALL_PREFIX
-          -D CMAKE_BUILD_TYPE=$BUILD_TYPE
+        env:
+          UBPM_MODULE_PATH: ${{ steps.ubpm.outputs.location }}
+        run: cmake -S . -B build
 
       - name: Build
         run: cmake --build build
