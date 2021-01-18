@@ -32,10 +32,12 @@ target_include_directories(
 target_compile_features(AdHocServer PRIVATE cxx_std_17)
 
 find_package(blobify REQUIRED)
+find_package(daw_json_link REQUIRED)
 find_package(SQLite3 REQUIRED)
 target_link_libraries(
     AdHocServer
     PRIVATE
+    daw::json_link
     blobify::blobify
     SQLite::SQLite3
 )
