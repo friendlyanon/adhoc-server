@@ -29,12 +29,9 @@ jobs:
           path: .ubpm
           key: ${{ hashFiles('dependencies.cmake') }}
 
-      - uses: friendlyanon/ubpm@pre-v2
-        id: ubpm
+      - uses: friendlyanon/ubpm@pre-v3
 
       - name: Configure
-        env:
-          UBPM_MODULE_PATH: ${{ steps.ubpm.outputs.location }}
         run: cmake -S . -B build
 
       - name: Build
