@@ -29,7 +29,7 @@ jobs:
           path: .ubpm
           key: ${{ hashFiles('dependencies.cmake') }}
 
-      - uses: friendlyanon/ubpm@pre-v1
+      - uses: friendlyanon/ubpm@pre-v2
         id: ubpm
 
       - name: Configure
