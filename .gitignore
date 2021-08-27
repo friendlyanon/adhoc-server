@@ -1,4 +1,10 @@
-_clone/
-_build/
+.idea/
+.vs/
+.vscode/
 build/
-install/
+cmake/open-cpp-coverage.cmake
+cmake-build-*/
+prefix/
+CMakeLists.txt.user
+CMakeUserPresets.json
+project-include-after.cmake
