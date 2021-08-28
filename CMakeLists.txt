@@ -28,7 +28,7 @@ target_include_directories(
     "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/source>"
 )
 
-target_compile_features(adhoc-server_lib PUBLIC c_std_99)
+target_compile_features(adhoc-server_lib PUBLIC c_std_11)
 
 # ---- Declare executable ----
 
@@ -41,7 +41,7 @@ set_target_properties(
     EXPORT_NAME adhoc-server
 )
 
-target_compile_features(adhoc-server_adhoc-server PRIVATE c_std_99)
+target_compile_features(adhoc-server_adhoc-server PRIVATE c_std_11)
 
 target_link_libraries(adhoc-server_adhoc-server PRIVATE adhoc-server_lib)
 
