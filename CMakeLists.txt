@@ -15,7 +15,25 @@ docs_early_return()
 include(cmake/project-is-top-level.cmake)
 include(cmake/variables.cmake)
 
-# ---- Declare library ----
+# ---- Declare libraries ----
+
+add_library(adhoc-server_server OBJECT)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+  target_sources(adhoc-server_server PRIVATE source/server.nt.c)
+  target_link_libraries(adhoc-server_server PRIVATE Mswsock Ws2_32)
+  target_compile_definitions(adhoc-server_server PRIVATE WIN32_LEAN_AND_MEAN)
+else()
+  target_sources(adhoc-server_server PRIVATE source/server.posix.c)
+endif()
+
+target_include_directories(
+    adhoc-server_server ${adhoc-server_warning_guard}
+    PUBLIC
+    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/source>"
+)
+
+target_compile_features(adhoc-server_server PUBLIC c_std_11)
 
 add_library(
     adhoc-server_lib OBJECT
@@ -43,7 +61,11 @@ set_target_properties(
 
 target_compile_features(adhoc-server_adhoc-server PRIVATE c_std_11)
 
-target_link_libraries(adhoc-server_adhoc-server PRIVATE adhoc-server_lib)
+target_link_libraries(
+    adhoc-server_adhoc-server PRIVATE
+    adhoc-server_lib
+    adhoc-server_server
+)
 
 # ---- Install rules ----
 
