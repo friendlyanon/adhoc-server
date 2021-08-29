@@ -29,21 +29,21 @@ size_t socket_size()
   return sizeof(ah_socket);
 }
 
-static ah_socket create_unbound_socket(ah_socket socket)
+static ah_socket create_unbound_socket(ah_socket socket_)
 {
-  if (!socket.ok) {
-    return socket;
+  if (!socket_.ok) {
+    return socket_;
   }
 
   int unbound_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (unbound_socket < 0) {
     perror("socket");
-    socket.ok = false;
+    socket_.ok = false;
   } else {
-    socket.socket = unbound_socket;
+    socket_.socket = unbound_socket;
   }
 
-  return socket;
+  return socket_;
 }
 
 static ah_socket bind_socket(ah_socket socket, int port)
