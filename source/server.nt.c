@@ -73,3 +73,76 @@ bool create_server(void* result_server)
   memcpy(result_server, &server, server_size());
   return server.ok;
 }
+
+typedef struct ah_socket {
+  bool ok;
+  SOCKET socket;
+} ah_socket;
+
+size_t socket_size()
+{
+  return sizeof(ah_socket);
+}
+
+static ah_socket create_unbound_socket(ah_socket socket)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  SOCKET unbound_socket = WSASocket(
+      AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+  if (unbound_socket == INVALID_SOCKET) {
+    fprintf(stderr, "WSASocket: %d\n", WSAGetLastError());
+    socket.ok = false;
+  } else {
+    socket.socket = unbound_socket;
+  }
+
+  return socket;
+}
+
+static ah_socket bind_socket(ah_socket socket, int port)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  struct sockaddr_in address = {
+      .sin_family = AF_INET,
+      .sin_port = htons(port),
+      .sin_addr = {.s_addr = INADDR_ANY},
+  };
+  const struct sockaddr* address_ptr = (const struct sockaddr*)&address;
+  if (bind(socket.socket, address_ptr, sizeof(address)) == SOCKET_ERROR) {
+    fprintf(stderr, "bind() failed on port %d\n", port);
+    socket.ok = false;
+  }
+
+  return socket;
+}
+
+static ah_socket listen_on_socket(ah_socket socket)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  if (listen(socket.socket, SOMAXCONN) == SOCKET_ERROR) {
+    fprintf(stderr, "listen: %d\n", WSAGetLastError());
+    socket.ok = false;
+  }
+
+  return socket;
+}
+
+bool create_socket(void* result_socket, int port)
+{
+  ah_socket socket = {.ok = true, .socket = INVALID_SOCKET};
+  socket = create_unbound_socket(socket);
+  socket = bind_socket(socket, port);
+  socket = listen_on_socket(socket);
+
+  memcpy(result_socket, &socket, socket_size());
+  return socket.ok;
+}

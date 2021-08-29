@@ -22,7 +22,11 @@ add_library(adhoc-server_server OBJECT)
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   target_sources(adhoc-server_server PRIVATE source/server.nt.c)
   target_link_libraries(adhoc-server_server PRIVATE Mswsock Ws2_32)
-  target_compile_definitions(adhoc-server_server PRIVATE WIN32_LEAN_AND_MEAN)
+  target_compile_definitions(
+      adhoc-server_server PRIVATE
+      WIN32_LEAN_AND_MEAN
+      UNICODE
+  )
 else()
   target_sources(adhoc-server_server PRIVATE source/server.posix.c)
 endif()
