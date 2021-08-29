@@ -63,7 +63,7 @@ static server create_completion_port(server server)
 
 bool create_server(void* result_server)
 {
-  server server = (struct server) {
+  server server = {
       .ok = true,
       .completion_port = INVALID_HANDLE_VALUE,
   };
