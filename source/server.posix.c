@@ -6,4 +6,14 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
-/* TODO: implement server */
+size_t server_size()
+{
+  return 0;
+}
+
+bool create_server(void* result_server)
+{
+  (void)result_server;
+
+  return true;
+}
