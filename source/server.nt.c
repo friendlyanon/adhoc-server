@@ -4,6 +4,28 @@
 #include <stdio.h>
 #include <string.h>
 
+#define ERROR_MESSAGE_SIZE 256
+
+static void print_error(const char* function, int error_code)
+{
+  char error_message[ERROR_MESSAGE_SIZE];
+  error_message[0] = '\0';
+
+  FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                 NULL,
+                 error_code,
+                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                 error_message,
+                 ERROR_MESSAGE_SIZE,
+                 NULL);
+
+  if (error_message[0] == '\0') {
+    fprintf(stderr, "%s: %d\n", function, error_code);
+  } else {
+    fprintf(stderr, "%s: %s\n", function, error_message);
+  }
+}
+
 typedef struct ah_server {
   bool ok;
   bool server_started;
@@ -24,7 +46,7 @@ static ah_server startup(ah_server server)
   WSADATA wsa_data;
   int startup_result = WSAStartup(MAKEWORD(2, 2), &wsa_data);
   if (startup_result != 0) {
-    fprintf(stderr, "WSAStartup: %d\n", startup_result);
+    print_error("WSAStartup", startup_result);
     server.ok = false;
     return server;
   }
@@ -52,7 +74,7 @@ static ah_server create_completion_port(ah_server server)
   HANDLE completion_port =
       CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
   if (completion_port == NULL) {
-    fprintf(stderr, "CreateIoCompletionPort: %lu\n", GetLastError());
+    print_error("CreateIoCompletionPort", GetLastError());
     server.ok = false;
   } else {
     server.completion_port = completion_port;
@@ -93,7 +115,7 @@ static ah_socket create_unbound_socket(ah_socket socket)
   SOCKET unbound_socket = WSASocket(
       AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
   if (unbound_socket == INVALID_SOCKET) {
-    fprintf(stderr, "WSASocket: %d\n", WSAGetLastError());
+    print_error("WSASocket", WSAGetLastError());
     socket.ok = false;
   } else {
     socket.socket = unbound_socket;
@@ -129,7 +151,7 @@ static ah_socket listen_on_socket(ah_socket socket)
   }
 
   if (listen(socket.socket, SOMAXCONN) == SOCKET_ERROR) {
-    fprintf(stderr, "listen: %d\n", WSAGetLastError());
+    print_error("listen", WSAGetLastError());
     socket.ok = false;
   }
 
