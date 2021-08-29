@@ -36,6 +36,11 @@ jobs:
       matrix:
         os: [ubuntu, windows]
 
+        include:
+        - os: windows
+          # Disable C5105, because the Windows runner uses an old SDK
+          env: '{ "EXTRA_C_FLAGS": "/wd5105" }'
+
     runs-on: ${{ matrix.os }}-latest
 
     steps:
@@ -46,6 +51,7 @@ jobs:
       run: sudo apt-get install clang-tidy cppcheck -y -q
 
     - name: Configure
+      env: ${{ fromJson(matrix.env || '{}') }}
       run: cmake --preset=ci-${{ matrix.os }}
 
     - name: Build
