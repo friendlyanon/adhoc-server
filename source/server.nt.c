@@ -4,18 +4,18 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct server {
+typedef struct ah_server {
   bool ok;
   bool server_started;
   HANDLE completion_port;
-} server;
+} ah_server;
 
 size_t server_size()
 {
-  return sizeof(server);
+  return sizeof(ah_server);
 }
 
-static server startup(server server)
+static ah_server startup(ah_server server)
 {
   if (!server.ok) {
     return server;
@@ -43,7 +43,7 @@ static server startup(server server)
   return server;
 }
 
-static server create_completion_port(server server)
+static ah_server create_completion_port(ah_server server)
 {
   if (!server.ok) {
     return server;
@@ -63,7 +63,7 @@ static server create_completion_port(server server)
 
 bool create_server(void* result_server)
 {
-  server server = {
+  ah_server server = {
       .ok = true,
       .completion_port = INVALID_HANDLE_VALUE,
   };
