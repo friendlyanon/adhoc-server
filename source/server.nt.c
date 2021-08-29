@@ -137,7 +137,7 @@ static ah_socket bind_socket(ah_socket socket, uint16_t port)
   };
   const struct sockaddr* address_ptr = (const struct sockaddr*)&address;
   if (bind(socket.socket, address_ptr, sizeof(address)) == SOCKET_ERROR) {
-    fprintf(stderr, "bind() failed on port %hu\n", port);
+    print_error("bind", WSAGetLastError());
     socket.ok = false;
   }
 
