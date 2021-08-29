@@ -87,7 +87,7 @@ static ah_socket listen_on_socket(ah_socket socket)
 
 bool create_socket(void* result_socket, int port)
 {
-  ah_socket socket = {.ok = true, .socket = INVALID_SOCKET};
+  ah_socket socket = {.ok = true, .socket = -1};
   socket = create_unbound_socket(socket);
   socket = bind_socket(socket, port);
   socket = listen_on_socket(socket);
