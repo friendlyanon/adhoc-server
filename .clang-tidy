@@ -3,6 +3,7 @@
 Checks: "-*,\
   -google-readability-todo,\
   clang-analyzer-*,\
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,\
   cert-*,\
   bugprone-*,\
   concurrency-*,\
