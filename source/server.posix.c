@@ -67,11 +67,6 @@ static ah_socket bind_socket(ah_socket socket, uint16_t port)
   return socket;
 }
 
-/**
- * POSIX does not provide a macro similar to SOMAXCONN from Windows.
- */
-#define SOMAXCONN 5
-
 static ah_socket listen_on_socket(ah_socket socket)
 {
   if (!socket.ok) {
