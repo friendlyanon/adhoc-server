@@ -4,7 +4,7 @@
 #include <stddef.h>
 
 /**
- * @brief Returns the size of the struct to be allocated for ::create_server.
+ * @brief Returns the size of the buffer to be allocated for ::create_server.
  */
 size_t server_size(void);
 
