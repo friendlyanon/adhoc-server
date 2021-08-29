@@ -124,7 +124,7 @@ static ah_socket create_unbound_socket(ah_socket socket)
   return socket;
 }
 
-static ah_socket bind_socket(ah_socket socket, int port)
+static ah_socket bind_socket(ah_socket socket, uint16_t port)
 {
   if (!socket.ok) {
     return socket;
@@ -137,7 +137,7 @@ static ah_socket bind_socket(ah_socket socket, int port)
   };
   const struct sockaddr* address_ptr = (const struct sockaddr*)&address;
   if (bind(socket.socket, address_ptr, sizeof(address)) == SOCKET_ERROR) {
-    fprintf(stderr, "bind() failed on port %d\n", port);
+    fprintf(stderr, "bind() failed on port %hu\n", port);
     socket.ok = false;
   }
 
@@ -158,7 +158,7 @@ static ah_socket listen_on_socket(ah_socket socket)
   return socket;
 }
 
-bool create_socket(void* result_socket, int port)
+bool create_socket(void* result_socket, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = INVALID_SOCKET};
   socket = create_unbound_socket(socket);

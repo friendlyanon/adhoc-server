@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -21,4 +22,4 @@ size_t socket_size(void);
 /**
  * @brief Create a TCP/IPv4 socket bound to and listening on \c port.
  */
-bool create_socket(void* result_socket, int port);
+bool create_socket(void* result_socket, uint16_t port);

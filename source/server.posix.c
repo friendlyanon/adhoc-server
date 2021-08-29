@@ -46,7 +46,7 @@ static ah_socket create_unbound_socket(ah_socket socket_)
   return socket_;
 }
 
-static ah_socket bind_socket(ah_socket socket, int port)
+static ah_socket bind_socket(ah_socket socket, uint16_t port)
 {
   if (!socket.ok) {
     return socket;
@@ -85,7 +85,7 @@ static ah_socket listen_on_socket(ah_socket socket)
   return socket;
 }
 
-bool create_socket(void* result_socket, int port)
+bool create_socket(void* result_socket, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = -1};
   socket = create_unbound_socket(socket);
