@@ -13,7 +13,7 @@ size_t server_size()
   return 0;
 }
 
-bool create_server(void* result_server)
+bool create_server(ah_server* result_server)
 {
   (void)result_server;
 
@@ -81,7 +81,7 @@ static ah_socket listen_on_socket(ah_socket socket)
   return socket;
 }
 
-bool create_socket(void* result_socket, uint16_t port)
+bool create_socket(ah_socket* result_socket, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = -1};
   socket = create_unbound_socket(socket);

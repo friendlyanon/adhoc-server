@@ -83,7 +83,7 @@ static ah_server create_completion_port(ah_server server)
   return server;
 }
 
-bool create_server(void* result_server)
+bool create_server(ah_server* result_server)
 {
   ah_server server = {
       .ok = true,
@@ -158,7 +158,7 @@ static ah_socket listen_on_socket(ah_socket socket)
   return socket;
 }
 
-bool create_socket(void* result_socket, uint16_t port)
+bool create_socket(ah_socket* result_socket, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = INVALID_SOCKET};
   socket = create_unbound_socket(socket);
