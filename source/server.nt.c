@@ -20,7 +20,7 @@ static void print_error(const char* function, int error_code)
                  NULL);
 
   if (error_message[0] == '\0') {
-    fprintf(stderr, "%s: %d\n", function, error_code);
+    fprintf(stderr, "%s: 0x%08X\n", function, (unsigned int)error_code);
   } else {
     fprintf(stderr, "%s: %s\n", function, error_message);
   }
