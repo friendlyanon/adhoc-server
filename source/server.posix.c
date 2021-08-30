@@ -1,6 +1,7 @@
 #include "server.h"
 
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <string.h>
@@ -50,6 +51,21 @@ static ah_socket create_unbound_socket(ah_socket socket_)
   return socket_;
 }
 
+static ah_socket socket_set_nonblocking(ah_socket socket)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  int flags = fcntl(socket.socket, F_GETFL);
+  if (flags < 0 || fcntl(socket.socket, F_SETFL, flags | O_NONBLOCK) < 0) {
+    perror("fcntl");
+    socket.ok = false;
+  }
+
+  return socket;
+}
+
 static ah_socket bind_socket(ah_socket socket, uint16_t port)
 {
   if (!socket.ok) {
@@ -88,6 +104,7 @@ bool create_socket(ah_socket* result_socket, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = -1};
   socket = create_unbound_socket(socket);
+  socket = socket_set_nonblocking(socket);
   socket = bind_socket(socket, port);
   socket = listen_on_socket(socket);
 
