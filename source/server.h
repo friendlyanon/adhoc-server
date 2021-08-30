@@ -30,7 +30,7 @@ size_t socket_size(void);
 /**
  * @brief Create a TCP/IPv4 socket bound to and listening on \c port.
  */
-bool create_socket(ah_socket* result_socket, uint16_t port);
+bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port);
 
 /**
  * @brief Sets the internal socket span to the one provided.

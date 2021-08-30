@@ -127,6 +127,27 @@ static ah_socket create_unbound_socket(ah_socket socket)
   return socket;
 }
 
+static ah_socket register_socket(ah_socket socket, ah_server* server)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  _Static_assert(sizeof(HANDLE) == sizeof(SOCKET),
+                 "HANDLE and SOCKET differ in size");
+  HANDLE socket_handle;
+  memcpy(&socket_handle, &socket.socket, sizeof(SOCKET));
+
+  HANDLE result =
+      CreateIoCompletionPort(socket_handle, server->completion_port, 0, 0);
+  if (result == NULL) {
+    print_error("CreateIoCompletionPort", GetLastError());
+    socket.ok = false;
+  }
+
+  return socket;
+}
+
 static ah_socket socket_enable_address_reuse(ah_socket socket)
 {
   if (!socket.ok) {
@@ -181,10 +202,11 @@ static ah_socket listen_on_socket(ah_socket socket)
   return socket;
 }
 
-bool create_socket(ah_socket* result_socket, uint16_t port)
+bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = INVALID_SOCKET};
   socket = create_unbound_socket(socket);
+  socket = register_socket(socket, server);
   socket = socket_enable_address_reuse(socket);
   socket = bind_socket(socket, port);
   socket = listen_on_socket(socket);

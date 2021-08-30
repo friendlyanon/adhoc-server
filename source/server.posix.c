@@ -117,8 +117,10 @@ static ah_socket listen_on_socket(ah_socket socket)
   return socket;
 }
 
-bool create_socket(ah_socket* result_socket, uint16_t port)
+bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
+  (void)server;
+
   ah_socket socket = {.ok = true, .socket = -1};
   socket = create_unbound_socket(socket);
   socket = socket_set_nonblocking(socket);
