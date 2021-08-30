@@ -66,6 +66,23 @@ static ah_socket socket_set_nonblocking(ah_socket socket)
   return socket;
 }
 
+static ah_socket socket_enable_address_reuse(ah_socket socket)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  int enable = true;
+  int result = setsockopt(
+      socket.socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+  if (result < 0) {
+    perror("setsockopt");
+    socket.ok = false;
+  }
+
+  return socket;
+}
+
 static ah_socket bind_socket(ah_socket socket, uint16_t port)
 {
   if (!socket.ok) {
@@ -105,6 +122,7 @@ bool create_socket(ah_socket* result_socket, uint16_t port)
   ah_socket socket = {.ok = true, .socket = -1};
   socket = create_unbound_socket(socket);
   socket = socket_set_nonblocking(socket);
+  socket = socket_enable_address_reuse(socket);
   socket = bind_socket(socket, port);
   socket = listen_on_socket(socket);
 

@@ -127,6 +127,26 @@ static ah_socket create_unbound_socket(ah_socket socket)
   return socket;
 }
 
+static ah_socket socket_enable_address_reuse(ah_socket socket)
+{
+  if (!socket.ok) {
+    return socket;
+  }
+
+  BOOL enable = TRUE;
+  int result = setsockopt(socket.socket,
+                          SOL_SOCKET,
+                          SO_REUSEADDR,
+                          (const char*)&enable,
+                          sizeof(enable));
+  if (result == SOCKET_ERROR) {
+    print_error("setsockopt", WSAGetLastError());
+    socket.ok = false;
+  }
+
+  return socket;
+}
+
 static ah_socket bind_socket(ah_socket socket, uint16_t port)
 {
   if (!socket.ok) {
@@ -165,6 +185,7 @@ bool create_socket(ah_socket* result_socket, uint16_t port)
 {
   ah_socket socket = {.ok = true, .socket = INVALID_SOCKET};
   socket = create_unbound_socket(socket);
+  socket = socket_enable_address_reuse(socket);
   socket = bind_socket(socket, port);
   socket = listen_on_socket(socket);
 
