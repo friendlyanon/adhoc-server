@@ -30,6 +30,7 @@ typedef struct ah_server {
   bool ok;
   bool server_started;
   HANDLE completion_port;
+  ah_socket_span socket_span;
 } ah_server;
 
 size_t server_size()
@@ -167,4 +168,14 @@ bool create_socket(ah_socket* result_socket, uint16_t port)
 
   memcpy(result_socket, &socket, socket_size());
   return socket.ok;
+}
+
+void set_socket_span(ah_server* server, ah_socket_span span)
+{
+  server->socket_span = span;
+}
+
+ah_socket* span_get_socket(ah_server* server, size_t index)
+{
+  return &server->socket_span.sockets[index];
 }
