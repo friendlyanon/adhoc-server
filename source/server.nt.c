@@ -49,18 +49,20 @@ static ah_server startup(ah_server server)
   if (startup_result != 0) {
     print_error("WSAStartup", startup_result);
     server.ok = false;
-    return server;
-  }
-  server.server_started = true;
+  } else {
+    server.server_started = true;
 
-  if (LOBYTE(wsa_data.wVersion) != 2 || HIBYTE(wsa_data.wVersion) != 2) {
-    fprintf(stderr,
-            "Could not find a usable version of Winsock.dll\n"
-            "  Expected: 2.2\n"
-            "  Actual: %d.%d\n",
-            (int)LOBYTE(wsa_data.wVersion),
-            (int)HIBYTE(wsa_data.wVersion));
-    server.ok = false;
+    int major = LOBYTE(wsa_data.wVersion);
+    int minor = HIBYTE(wsa_data.wVersion);
+    if (major != 2 || minor != 2) {
+      fprintf(stderr,
+              "Could not find a usable version of Winsock.dll\n"
+              "  Expected: 2.2\n"
+              "  Actual: %d.%d\n",
+              major,
+              minor);
+      server.ok = false;
+    }
   }
 
   return server;
