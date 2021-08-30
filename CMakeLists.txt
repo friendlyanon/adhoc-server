@@ -27,6 +27,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
       WIN32_LEAN_AND_MEAN
       UNICODE
   )
+  if(NOT CMAKE_VERSION VERSION_LESS "3.16")
+    target_precompile_headers(
+        adhoc-server_server PRIVATE
+        <WinSock2.h> # this must come before MSWSock.h
+        <MSWSock.h>
+    )
+  endif()
 else()
   target_sources(adhoc-server_server PRIVATE source/server.posix.c)
 endif()
