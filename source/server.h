@@ -28,7 +28,7 @@ bool create_server(ah_server* result_server);
 size_t socket_size(void);
 
 /**
- * @brief Create a TCP/IPv4 socket bound to and listening on \c port.
+ * @brief Creates a TCP/IPv4 socket bound to and listening on \c port.
  */
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port);
 

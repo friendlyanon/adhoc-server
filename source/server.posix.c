@@ -9,6 +9,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+/* Server creation */
+
 typedef struct ah_server {
   ah_socket_span socket_span;
 } ah_server;
@@ -24,69 +26,86 @@ bool create_server(ah_server* result_server)
   return true;
 }
 
+void set_socket_span(ah_server* server, ah_socket_span span)
+{
+  server->socket_span = span;
+}
+
+/* Socket creation */
+
 typedef struct ah_socket {
-  bool ok;
   int socket;
 } ah_socket;
+
+ah_socket* span_get_socket(ah_server* server, size_t index)
+{
+  return &server->socket_span.sockets[index];
+}
+
+typedef struct ah_socket_slot {
+  bool ok;
+  ah_socket socket;
+} ah_socket_slot;
 
 size_t socket_size()
 {
   return sizeof(ah_socket);
 }
 
-static ah_socket create_unbound_socket(ah_socket socket_)
+static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
 {
-  if (!socket_.ok) {
-    return socket_;
+  if (!slot.ok) {
+    return slot;
   }
 
   int unbound_socket = socket(AF_INET, SOCK_STREAM, 0);
   if (unbound_socket < 0) {
     perror("socket");
-    socket_.ok = false;
+    slot.ok = false;
   } else {
-    socket_.socket = unbound_socket;
+    slot.socket = unbound_socket;
   }
 
-  return socket_;
+  return slot;
 }
 
-static ah_socket socket_set_nonblocking(ah_socket socket)
+static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot)
 {
-  if (!socket.ok) {
-    return socket;
+  if (!slot.ok) {
+    return slot;
   }
 
-  int flags = fcntl(socket.socket, F_GETFL);
-  if (flags < 0 || fcntl(socket.socket, F_SETFL, flags | O_NONBLOCK) < 0) {
+  int socket_descriptor = slot.socket.socket;
+  int flags = fcntl(socket_descriptor, F_GETFL);
+  if (flags < 0 || fcntl(socket_descriptor, F_SETFL, flags | O_NONBLOCK) < 0) {
     perror("fcntl");
-    socket.ok = false;
+    slot.ok = false;
   }
 
-  return socket;
+  return slot;
 }
 
-static ah_socket socket_enable_address_reuse(ah_socket socket)
+static ah_socket_slot socket_enable_address_reuse(ah_socket_slot slot)
 {
-  if (!socket.ok) {
-    return socket;
+  if (!slot.ok) {
+    return slot;
   }
 
   int enable = true;
   int result = setsockopt(
-      socket.socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+      slot.socket.socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
   if (result < 0) {
     perror("setsockopt");
-    socket.ok = false;
+    slot.ok = false;
   }
 
-  return socket;
+  return slot;
 }
 
-static ah_socket bind_socket(ah_socket socket, uint16_t port)
+static ah_socket_slot bind_socket(ah_socket_slot slot, uint16_t port)
 {
-  if (!socket.ok) {
-    return socket;
+  if (!slot.ok) {
+    return slot;
   }
 
   struct sockaddr_in address = {
@@ -95,49 +114,39 @@ static ah_socket bind_socket(ah_socket socket, uint16_t port)
       .sin_addr = {.s_addr = INADDR_ANY},
   };
   const struct sockaddr* address_ptr = (const struct sockaddr*)&address;
-  if (bind(socket.socket, address_ptr, sizeof(address)) < 0) {
+  if (bind(slot.socket.socket, address_ptr, sizeof(address)) < 0) {
     perror("bind");
-    socket.ok = false;
+    slot.ok = false;
   }
 
-  return socket;
+  return slot;
 }
 
-static ah_socket listen_on_socket(ah_socket socket)
+static ah_socket_slot listen_on_socket(ah_socket_slot slot)
 {
-  if (!socket.ok) {
-    return socket;
+  if (!slot.ok) {
+    return slot;
   }
 
-  if (listen(socket.socket, SOMAXCONN) < 0) {
+  if (listen(slot.socket.socket, SOMAXCONN) < 0) {
     perror("listen");
-    socket.ok = false;
+    slot.ok = false;
   }
 
-  return socket;
+  return slot;
 }
 
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
   (void)server;
 
-  ah_socket socket = {.ok = true, .socket = -1};
-  socket = create_unbound_socket(socket);
-  socket = socket_set_nonblocking(socket);
-  socket = socket_enable_address_reuse(socket);
-  socket = bind_socket(socket, port);
-  socket = listen_on_socket(socket);
+  ah_socket_slot slot = {true, {-1}};
+  slot = create_unbound_socket(slot);
+  slot = socket_set_nonblocking(slot);
+  slot = socket_enable_address_reuse(slot);
+  slot = bind_socket(slot, port);
+  slot = listen_on_socket(slot);
 
-  memcpy(result_socket, &socket, socket_size());
-  return socket.ok;
-}
-
-void set_socket_span(ah_server* server, ah_socket_span span)
-{
-  server->socket_span = span;
-}
-
-ah_socket* span_get_socket(ah_server* server, size_t index)
-{
-  return &server->socket_span.sockets[index];
+  memcpy(result_socket, &slot.socket, socket_size());
+  return slot.ok;
 }
