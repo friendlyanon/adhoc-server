@@ -167,3 +167,36 @@ bool destroy_socket(ah_socket* socket)
   socket->socket = -1;
   return true;
 }
+
+/* Acceptor creation */
+
+typedef struct ah_acceptor {
+  char dummy;
+} ah_acceptor;
+
+size_t acceptor_size()
+{
+  return sizeof(ah_acceptor);
+}
+
+bool create_acceptor(ah_acceptor* result_acceptor,
+                     ah_server* server,
+                     ah_socket* listening_socket,
+                     ah_on_accept on_accept)
+{
+  (void)server;
+  (void)listening_socket;
+  (void)on_accept;
+
+  *result_acceptor = (ah_acceptor) {0};
+  return true;
+}
+
+/* Event loop */
+
+bool server_tick(ah_server* server)
+{
+  (void)server;
+
+  return true;
+}
