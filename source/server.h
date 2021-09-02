@@ -33,6 +33,11 @@ size_t socket_size(void);
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port);
 
 /**
+ * @brief Closes the provided socket.
+ */
+bool destroy_socket(ah_socket* socket);
+
+/**
  * @brief Sets the internal socket span to the one provided.
  */
 void set_socket_span(ah_server* server, ah_socket_span span);

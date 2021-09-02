@@ -234,3 +234,20 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
   memcpy(result_socket, &slot.socket, socket_size());
   return slot.ok;
 }
+
+/* Socket destruction */
+
+bool destroy_socket(ah_socket* socket)
+{
+  if (socket->socket == INVALID_SOCKET) {
+    return true;
+  }
+
+  if (closesocket(socket->socket) == SOCKET_ERROR) {
+    print_error("closesocket", WSAGetLastError());
+    return false;
+  }
+
+  socket->socket = INVALID_SOCKET;
+  return true;
+}

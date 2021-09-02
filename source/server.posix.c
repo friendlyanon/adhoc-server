@@ -150,3 +150,20 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
   memcpy(result_socket, &slot.socket, socket_size());
   return slot.ok;
 }
+
+/* Socket destruction */
+
+bool destroy_socket(ah_socket* socket)
+{
+  if (socket->socket == -1) {
+    return true;
+  }
+
+  if (close(socket->socket) != 0) {
+    perror("close");
+    return false;
+  }
+
+  socket->socket = -1;
+  return true;
+}
