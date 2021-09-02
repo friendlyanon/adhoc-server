@@ -390,3 +390,27 @@ bool create_acceptor(ah_acceptor* result_acceptor,
   };
   return do_accept(&result_acceptor->base.overlapped);
 }
+
+/* Event loop */
+
+bool server_tick(ah_server* server)
+{
+  DWORD bytes_transferred;
+  ULONG_PTR completion_key;
+  LPOVERLAPPED overlapped;
+  BOOL result = GetQueuedCompletionStatus(server->completion_port,
+                                          &bytes_transferred,
+                                          &completion_key,
+                                          &overlapped,
+                                          INFINITE);
+  if (result == FALSE) {
+    print_error("GetQueuedCompletionStatus", GetLastError());
+    return false;
+  }
+
+  if (!base_from_overlapped(overlapped)->handler(overlapped)) {
+    return false;
+  }
+
+  return true;
+}

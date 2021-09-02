@@ -66,3 +66,8 @@ bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_server* server,
                      ah_socket* listening_socket,
                      ah_on_accept on_accept);
+
+/**
+ * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.
+ */
+bool server_tick(ah_server* server);
