@@ -59,11 +59,7 @@ target_include_directories(
 
 target_compile_features(adhoc-server_lib PUBLIC c_std_11)
 
-target_link_libraries(
-    adhoc-server_lib
-    PRIVATE adhoc-server_server
-    INTERFACE "$<TARGET_OBJECTS:adhoc-server_server>"
-)
+target_link_libraries(adhoc-server_lib PRIVATE adhoc-server_server)
 
 # ---- Declare executable ----
 
@@ -78,7 +74,11 @@ set_target_properties(
 
 target_compile_features(adhoc-server_adhoc-server PRIVATE c_std_11)
 
-target_link_libraries(adhoc-server_adhoc-server PRIVATE adhoc-server_lib)
+target_link_libraries(
+    adhoc-server_adhoc-server PRIVATE
+    adhoc-server_server
+    adhoc-server_lib
+)
 
 # ---- Install rules ----
 
