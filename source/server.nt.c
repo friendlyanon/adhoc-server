@@ -408,9 +408,5 @@ bool server_tick(ah_server* server)
     return false;
   }
 
-  if (!base_from_overlapped(overlapped)->handler(overlapped)) {
-    return false;
-  }
-
-  return true;
+  return base_from_overlapped(overlapped)->handler(overlapped);
 }
