@@ -251,3 +251,142 @@ bool destroy_socket(ah_socket* socket)
   socket->socket = INVALID_SOCKET;
   return true;
 }
+
+/* Acceptor creation */
+
+typedef struct ah_overlapped_base {
+  OVERLAPPED overlapped;
+  bool (*handler)(LPOVERLAPPED);
+} ah_overlapped_base;
+
+static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
+{
+  char* base = (char*)overlapped - offsetof(ah_overlapped_base, overlapped);
+  return (ah_overlapped_base*)base;
+}
+
+#define ADDRESS_LENGTH ((DWORD)(sizeof(SOCKADDR_IN) + 16))
+
+typedef struct ah_acceptor {
+  ah_overlapped_base base;
+  ah_on_accept on_accept;
+  ah_server* server;
+  ah_socket listening_socket;
+  ah_socket socket;
+  uint8_t output_buffer[ADDRESS_LENGTH * 2];
+} ah_acceptor;
+
+static ah_acceptor* acceptor_from_overlapped(LPOVERLAPPED overlapped)
+{
+  char* acceptor =
+      (char*)base_from_overlapped(overlapped) - offsetof(ah_acceptor, base);
+  return (ah_acceptor*)acceptor;
+}
+
+size_t acceptor_size()
+{
+  return sizeof(ah_acceptor);
+}
+
+static bool do_accept(LPOVERLAPPED overlapped);
+
+static bool accept_handler(LPOVERLAPPED overlapped)
+{
+  ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+
+  LPSOCKADDR_IN local_address;
+  int local_address_length;
+  LPSOCKADDR_IN remote_address;
+  int remote_address_length;
+  GetAcceptExSockaddrs(acceptor->output_buffer,
+                       0,
+                       ADDRESS_LENGTH,
+                       ADDRESS_LENGTH,
+                       (LPSOCKADDR*)&local_address,
+                       &local_address_length,
+                       (LPSOCKADDR*)&remote_address,
+                       &remote_address_length);
+  LPIN_ADDR address = &remote_address->sin_addr;
+  ah_ipv4_address ipv4_address = {{
+      address->S_un.S_un_b.s_b1,
+      address->S_un.S_un_b.s_b2,
+      address->S_un.S_un_b.s_b3,
+      address->S_un.S_un_b.s_b4,
+  }};
+  /* TODO: Implement I/O for the handler */
+  bool result = acceptor->on_accept(ipv4_address, &acceptor->socket);
+  destroy_socket(&acceptor->socket);
+
+  return result ? do_accept(overlapped) : false;
+}
+
+static bool queue_accept_operation(HANDLE completion_port,
+                                   LPOVERLAPPED overlapped)
+{
+  BOOL result = PostQueuedCompletionStatus(completion_port, 0, 0, overlapped);
+  if (result == FALSE) {
+    print_error("PostQueuedCompletionStatus", GetLastError());
+    return false;
+  }
+
+  return true;
+}
+
+static bool do_accept(LPOVERLAPPED overlapped)
+{
+  ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+  {
+    ah_socket_slot slot =
+        create_unbound_socket((ah_socket_slot) {true, {INVALID_SOCKET}});
+    if (!slot.ok) {
+      return false;
+    }
+    acceptor->socket = slot.socket;
+  }
+
+  DWORD bytes_read;
+  BOOL result = AcceptEx(acceptor->listening_socket.socket,
+                         acceptor->socket.socket,
+                         acceptor->output_buffer,
+                         0,
+                         ADDRESS_LENGTH,
+                         ADDRESS_LENGTH,
+                         &bytes_read,
+                         overlapped);
+  if (result == FALSE) {
+    int error_code = WSAGetLastError();
+    /* If the error is WSAECONNRESET, an incoming connection was indicated, but
+     * was subsequently terminated by the remote peer prior to accepting the
+     * call. */
+    switch (error_code) {
+      case WSAECONNRESET:
+        destroy_socket(&acceptor->socket);
+        acceptor->base.handler = do_accept;
+        return queue_accept_operation(acceptor->server->completion_port,
+                                      overlapped);
+      case ERROR_IO_PENDING:
+        break;
+      default:
+        print_error("AcceptEx", error_code);
+        return false;
+    }
+  }
+
+  acceptor->base.handler = accept_handler;
+  return true;
+}
+
+bool create_acceptor(ah_acceptor* result_acceptor,
+                     ah_server* server,
+                     ah_socket* listening_socket,
+                     ah_on_accept on_accept)
+{
+  *result_acceptor = (ah_acceptor) {
+      .base = {0},
+      on_accept,
+      server,
+      *listening_socket,
+      INVALID_SOCKET,
+  };
+  return do_accept(&result_acceptor->base.overlapped);
+}

@@ -6,11 +6,18 @@
 
 typedef struct ah_server ah_server;
 typedef struct ah_socket ah_socket;
+typedef struct ah_acceptor ah_acceptor;
 
 typedef struct ah_socket_span {
   size_t size;
   ah_socket* sockets;
 } ah_socket_span;
+
+typedef struct ah_ipv4_address {
+  uint8_t address[4];
+} ah_ipv4_address;
+
+typedef bool (*ah_on_accept)(ah_ipv4_address address, ah_socket* socket);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -46,3 +53,16 @@ void set_socket_span(ah_server* server, ah_socket_span span);
  * @brief Returns a pointer to the socket at \c index.
  */
 ah_socket* span_get_socket(ah_server* server, size_t index);
+
+/**
+ * @brief Returns the size of the buffer to be allocated for ::create_acceptor.
+ */
+size_t acceptor_size(void);
+
+/**
+ * @brief Creates an acceptor that queues an accept operation in the server.
+ */
+bool create_acceptor(ah_acceptor* result_acceptor,
+                     ah_server* server,
+                     ah_socket* listening_socket,
+                     ah_on_accept on_accept);
