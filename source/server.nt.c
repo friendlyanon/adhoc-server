@@ -386,7 +386,7 @@ bool create_acceptor(ah_acceptor* result_acceptor,
       on_accept,
       server,
       *listening_socket,
-      INVALID_SOCKET,
+      {INVALID_SOCKET},
   };
   return do_accept(&result_acceptor->base.overlapped);
 }
