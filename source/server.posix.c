@@ -63,7 +63,7 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
     perror("socket");
     slot.ok = false;
   } else {
-    slot.socket = unbound_socket;
+    slot.socket.socket = unbound_socket;
   }
 
   return slot;
