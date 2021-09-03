@@ -8,6 +8,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 /* Server creation */
 
@@ -60,8 +61,16 @@ void set_socket_span(ah_server* server, ah_socket_span span)
 
 /* Socket creation */
 
+typedef enum ah_socket_role
+{
+  AH_SOCKET_ACCEPT = 0,
+  AH_SOCKET_IO,
+} ah_socket_role;
+
 typedef struct ah_socket {
   int socket;
+  ah_socket_role role;
+  void* pointer;
 } ah_socket;
 
 ah_socket* span_get_socket(ah_server* server, size_t index)
@@ -164,7 +173,9 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
   return slot;
 }
 
-static ah_socket_slot queue_socket(ah_socket_slot slot, ah_server* server)
+static ah_socket_slot queue_socket(ah_socket_slot slot,
+                                   ah_server* server,
+                                   ah_socket* result_socket)
 {
   if (!slot.ok) {
     return slot;
@@ -177,7 +188,7 @@ static ah_socket_slot queue_socket(ah_socket_slot slot, ah_server* server)
 #else
   uint32_t events = EPOLLIN | EPOLLET | EPOLLONESHOT;
 #endif
-  struct epoll_event event = {events, .data.fd = socket};
+  struct epoll_event event = {events, .data.ptr = result_socket};
   if (epoll_ctl(epoll_descriptor, EPOLL_CTL_ADD, socket, &event) == -1) {
     perror("epoll_ctl");
     slot.ok = false;
@@ -188,13 +199,13 @@ static ah_socket_slot queue_socket(ah_socket_slot slot, ah_server* server)
 
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
-  ah_socket_slot slot = {true, {-1}};
+  ah_socket_slot slot = {true, {-1, AH_SOCKET_ACCEPT, NULL}};
   slot = create_unbound_socket(slot);
   slot = socket_set_nonblocking(slot);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
-  slot = queue_socket(slot, server);
+  slot = queue_socket(slot, server, result_socket);
 
   memcpy(result_socket, &slot.socket, socket_size());
   return slot.ok;
@@ -220,12 +231,65 @@ bool destroy_socket(ah_socket* socket)
 /* Acceptor creation */
 
 typedef struct ah_acceptor {
-  char dummy;
+  bool (*handler)(ah_server*, ah_acceptor*, ah_socket*);
+  ah_on_accept on_accept;
 } ah_acceptor;
 
 size_t acceptor_size()
 {
   return sizeof(ah_acceptor);
+}
+
+static bool accept_handler(ah_server* server,
+                           ah_acceptor* acceptor,
+                           ah_socket* socket)
+{
+  struct sockaddr_in remote_address = {0};
+  socklen_t remote_address_length = sizeof(remote_address);
+  int incoming_socket = accept(socket->socket,
+                               (struct sockaddr*)&remote_address,
+                               &remote_address_length);
+  if (incoming_socket == -1) {
+    perror("accept");
+    return false;
+  }
+
+#ifndef EPOLLEXCLUSIVE
+  {
+    uint32_t events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+    struct epoll_event event = {events, .data.ptr = socket};
+    int result = epoll_ctl(
+        server->epoll_descriptor, EPOLL_CTL_ADD, socket->socket, &event);
+    if (result == -1) {
+      perror("epoll_ctl");
+      return false;
+    }
+  }
+#else
+  (void)server;
+#endif
+
+  ah_socket_slot slot = (ah_socket_slot) {
+      .ok = true,
+      {incoming_socket, AH_SOCKET_IO},
+  };
+  slot = socket_set_nonblocking(slot);
+  if (!slot.ok) {
+    return false;
+  }
+
+  uint32_t address_raw = ntohl(remote_address.sin_addr.s_addr);
+  ah_ipv4_address address = {{
+      address_raw >> 24 & 0xFF,
+      address_raw >> 16 & 0xFF,
+      address_raw >> 8 & 0xFF,
+      address_raw & 0xFF,
+  }};
+  /* TODO: Implement I/O for the handler */
+  bool result = acceptor->on_accept(address, &slot.socket);
+  destroy_socket(&slot.socket);
+
+  return result;
 }
 
 bool create_acceptor(ah_acceptor* result_acceptor,
@@ -234,10 +298,10 @@ bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_on_accept on_accept)
 {
   (void)server;
-  (void)listening_socket;
-  (void)on_accept;
 
-  *result_acceptor = (ah_acceptor) {0};
+  listening_socket->pointer = result_acceptor;
+
+  *result_acceptor = (ah_acceptor) {accept_handler, on_accept};
   return true;
 }
 
