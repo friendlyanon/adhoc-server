@@ -309,7 +309,23 @@ bool create_acceptor(ah_acceptor* result_acceptor,
 
 bool server_tick(ah_server* server)
 {
-  (void)server;
+  int new_events =
+      epoll_wait(server->epoll_descriptor, server->events, MAX_EVENTS, -1);
+  if (new_events == -1) {
+    perror("epoll_wait");
+    return false;
+  }
+
+  for (int i = 0; i < new_events; ++i) {
+    ah_socket* socket = (ah_socket*)server->events[i].data.ptr;
+    if (socket->role == AH_SOCKET_ACCEPT) {
+      ah_acceptor* acceptor = (ah_acceptor*)socket->pointer;
+      if (!acceptor->handler(server, acceptor, socket)) {
+        return false;
+      }
+    }
+    /* TODO: handle I/O events */
+  }
 
   return true;
 }
