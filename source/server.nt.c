@@ -307,15 +307,15 @@ static bool accept_handler(LPOVERLAPPED overlapped)
                        &local_address_length,
                        (LPSOCKADDR*)&remote_address,
                        &remote_address_length);
-  LPIN_ADDR address = &remote_address->sin_addr;
-  ah_ipv4_address ipv4_address = {{
-      address->S_un.S_un_b.s_b1,
-      address->S_un.S_un_b.s_b2,
-      address->S_un.S_un_b.s_b3,
-      address->S_un.S_un_b.s_b4,
+  uint32_t address_raw = ntohl(remote_address->sin_addr.s_addr);
+  ah_ipv4_address address = {{
+      address_raw >> 24 & 0xFF,
+      address_raw >> 16 & 0xFF,
+      address_raw >> 8 & 0xFF,
+      address_raw & 0xFF,
   }};
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(ipv4_address, &acceptor->socket);
+  bool result = acceptor->on_accept(address, &acceptor->socket);
   destroy_socket(&acceptor->socket);
 
   return result ? do_accept(overlapped) : false;
