@@ -164,16 +164,37 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
   return slot;
 }
 
+static ah_socket_slot queue_socket(ah_socket_slot slot, ah_server* server)
+{
+  if (!slot.ok) {
+    return slot;
+  }
+
+  int socket = slot.socket.socket;
+  int epoll_descriptor = server->epoll_descriptor;
+#ifdef EPOLLEXCLUSIVE
+  uint32_t events = EPOLLIN | EPOLLEXCLUSIVE;
+#else
+  uint32_t events = EPOLLIN | EPOLLET | EPOLLONESHOT;
+#endif
+  struct epoll_event event = {events, .data.fd = socket};
+  if (epoll_ctl(epoll_descriptor, EPOLL_CTL_ADD, socket, &event) == -1) {
+    perror("epoll_ctl");
+    slot.ok = false;
+  }
+
+  return slot;
+}
+
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
-  (void)server;
-
   ah_socket_slot slot = {true, {-1}};
   slot = create_unbound_socket(slot);
   slot = socket_set_nonblocking(slot);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
+  slot = queue_socket(slot, server);
 
   memcpy(result_socket, &slot.socket, socket_size());
   return slot.ok;
