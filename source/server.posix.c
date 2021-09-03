@@ -259,7 +259,7 @@ static bool accept_handler(ah_server* server,
     uint32_t events = EPOLLIN | EPOLLET | EPOLLONESHOT;
     struct epoll_event event = {events, .data.ptr = socket};
     int result = epoll_ctl(
-        server->epoll_descriptor, EPOLL_CTL_ADD, socket->socket, &event);
+        server->epoll_descriptor, EPOLL_CTL_MOD, socket->socket, &event);
     if (result == -1) {
       perror("epoll_ctl");
       return false;
