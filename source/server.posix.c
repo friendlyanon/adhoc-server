@@ -11,8 +11,12 @@
 
 /* Server creation */
 
+#define MAX_EVENTS 128
+
 typedef struct ah_server {
   ah_socket_span socket_span;
+  struct epoll_event events[MAX_EVENTS];
+  int epoll_descriptor;
 } ah_server;
 
 size_t server_size()
@@ -22,7 +26,12 @@ size_t server_size()
 
 bool create_server(ah_server* result_server)
 {
-  memset(result_server, 0, server_size());
+  *result_server = (ah_server) {.epoll_descriptor = epoll_create1(0)};
+  if (result_server->epoll_descriptor < 0) {
+    perror("epoll_create1");
+    return false;
+  }
+
   return true;
 }
 
