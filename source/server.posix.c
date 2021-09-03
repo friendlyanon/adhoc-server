@@ -26,11 +26,29 @@ size_t server_size()
 
 bool create_server(ah_server* result_server)
 {
-  *result_server = (ah_server) {.epoll_descriptor = epoll_create1(0)};
-  if (result_server->epoll_descriptor < 0) {
+#ifdef EPOLL_CLOEXEC
+  int descriptor = epoll_create1(EPOLL_CLOEXEC);
+#else
+  int descriptor = epoll_create(1);
+#endif
+
+  *result_server = (ah_server) {.epoll_descriptor = descriptor};
+  if (descriptor < 0) {
+#ifdef EPOLL_CLOEXEC
     perror("epoll_create1");
+#else
+    perror("epoll_create");
+#endif
+
     return false;
   }
+
+#ifndef EPOLL_CLOEXEC
+  if (fcntl(descriptor, F_SETFD, FD_CLOEXEC) < 0) {
+    perror("fcntl");
+    return false;
+  }
+#endif
 
   return true;
 }
