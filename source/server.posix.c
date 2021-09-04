@@ -76,7 +76,7 @@ typedef struct ah_socket {
 ah_socket* span_get_socket(ah_server* server, size_t index)
 {
   ah_socket_span span = server->socket_span;
-  return span.size < index ? NULL : &span.sockets[index];
+  return span.size <= index ? NULL : &span.sockets[index];
 }
 
 typedef struct ah_socket_slot {
