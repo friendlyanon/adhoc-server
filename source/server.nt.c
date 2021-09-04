@@ -3,26 +3,40 @@
 #include <MSWSock.h>
 #include <stdio.h>
 #include <string.h>
+#include <wctype.h>
 
 #define ERROR_MESSAGE_SIZE 256
 
+static void wide_trim_end(const wchar_t* begin, wchar_t* end)
+{
+  while (1) {
+    --end;
+    if (end < begin || iswspace(*end) == 0) {
+      end[1] = L'\0';
+      break;
+    }
+  }
+}
+
 static void print_error(const char* function, int error_code)
 {
-  char error_message[ERROR_MESSAGE_SIZE];
-  error_message[0] = '\0';
+  wchar_t error_message[ERROR_MESSAGE_SIZE];
+  error_message[0] = L'\0';
 
-  FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-                 NULL,
-                 error_code,
-                 MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                 error_message,
-                 ERROR_MESSAGE_SIZE,
-                 NULL);
+  DWORD result =
+      FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                     NULL,
+                     error_code,
+                     0,
+                     error_message,
+                     ERROR_MESSAGE_SIZE,
+                     NULL);
 
-  if (error_message[0] == '\0') {
-    fprintf(stderr, "%s: 0x%08X\n", function, (unsigned int)error_code);
+  if (result == 0 || error_message[0] == L'\0') {
+    fwprintf(stderr, L"%S: 0x%08X\n", function, (unsigned int)error_code);
   } else {
-    fprintf(stderr, "%s: %s\n", function, error_message);
+    wide_trim_end(error_message, &error_message[result]);
+    fwprintf(stderr, L"%S: %s\n", function, error_message);
   }
 }
 
