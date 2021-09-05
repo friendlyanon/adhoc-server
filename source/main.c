@@ -3,7 +3,6 @@
 #  include <io.h>
 #endif
 #include <lib.h>
-#include <locale.h>
 #include <stdio.h>
 
 int main(int argc, const char* argv[])
@@ -13,7 +12,7 @@ int main(int argc, const char* argv[])
 
 #ifdef _WIN32
   /* The library will report errors from the TCP server to stderr, but the
-   * messages are retreieved using FormatMessageW and if the system language
+   * messages are retrieved using FormatMessageW and if the system language
    * isn't english, then there is a possibility that the user will see garbled
    * text instead of the cause of the error */
   _setmode(_fileno(stderr), _O_U16TEXT);
