@@ -148,7 +148,7 @@ static ah_socket_slot bind_socket(ah_socket_slot slot, uint16_t port)
   struct sockaddr_in address = {
       .sin_family = AF_INET,
       .sin_port = htons(port),
-      .sin_addr = {.s_addr = INADDR_ANY},
+      .sin_addr = {.s_addr = htonl(INADDR_ANY)},
   };
   const struct sockaddr* address_ptr = (const struct sockaddr*)&address;
   if (bind(slot.socket.socket, address_ptr, sizeof(address)) < 0) {
