@@ -15,17 +15,29 @@ static void* ez_malloc(size_t size)
   return pointer;
 }
 
-static bool on_accept(ah_ipv4_address address, ah_socket* socket)
-{
-  (void)socket;
+typedef struct io_operation {
+  ah_socket_accepted socket;
+} io_operation;
 
+static bool on_accept(ah_ipv4_address address, ah_socket_accepted* socket)
+{
   printf("New connection from %d.%d.%d.%d\n",
          (int)address.address[0],
          (int)address.address[1],
          (int)address.address[2],
          (int)address.address[3]);
 
-  return true;
+  io_operation* op = malloc(sizeof(io_operation));
+  if (op == NULL) {
+    return false;
+  }
+
+  move_socket(&op->socket, socket);
+
+  bool result = destroy_socket_accepted(&op->socket);
+  free(op);
+
+  return result;
 }
 
 library create_library()

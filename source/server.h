@@ -17,7 +17,12 @@ typedef struct ah_ipv4_address {
   uint8_t address[4];
 } ah_ipv4_address;
 
-typedef bool (*ah_on_accept)(ah_ipv4_address address, ah_socket* socket);
+typedef struct ah_socket_accepted {
+  uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
+} ah_socket_accepted;
+
+typedef bool (*ah_on_accept)(ah_ipv4_address address,
+                             ah_socket_accepted* socket);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -43,6 +48,12 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port);
  * @brief Closes the provided socket.
  */
 bool destroy_socket(ah_socket* socket);
+
+/**
+ * @brief Closes the provided socket that was taken ownership of in an accept
+ * handler.
+ */
+bool destroy_socket_accepted(ah_socket_accepted* socket);
 
 /**
  * @brief Sets the internal socket span to the one provided.
@@ -71,3 +82,9 @@ bool create_acceptor(ah_acceptor* result_acceptor,
  * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.
  */
 bool server_tick(ah_server* server);
+
+/**
+ * @brief Takes the ownership of an accepted socket from the server in an
+ * ::ah_on_accept callback.
+ */
+void move_socket(ah_socket_accepted* result_socket, ah_socket_accepted* socket);

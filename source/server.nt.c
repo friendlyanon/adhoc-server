@@ -127,6 +127,10 @@ typedef struct ah_socket {
   SOCKET socket;
 } ah_socket;
 
+_Static_assert(
+    sizeof(ah_socket) == sizeof(ah_socket_accepted),
+    "AH_SOCKET_ACCEPTED_SIZE does not match the size of 'ah_socket'");
+
 ah_socket* span_get_socket(ah_server* server, size_t index)
 {
   ah_socket_span span = server->socket_span;
@@ -267,6 +271,11 @@ bool destroy_socket(ah_socket* socket)
   return true;
 }
 
+bool destroy_socket_accepted(ah_socket_accepted* socket)
+{
+  return destroy_socket((ah_socket*)socket);
+}
+
 /* Acceptor creation */
 
 typedef struct ah_overlapped_base {
@@ -328,9 +337,14 @@ static bool accept_handler(LPOVERLAPPED overlapped)
       address_raw >> 8 & 0xFF,
       address_raw & 0xFF,
   }};
+  ah_socket_slot slot = {true, acceptor->socket};
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(address, &acceptor->socket);
-  destroy_socket(&acceptor->socket);
+  bool result = acceptor->on_accept(address, (ah_socket_accepted*)&slot.socket);
+  /* If ownership of the socket wasn't taken by the handler, then it gets
+   * destroyed */
+  if (slot.ok) {
+    result = destroy_socket(&slot.socket) && result;
+  }
 
   return result ? do_accept(overlapped) : false;
 }
@@ -404,6 +418,22 @@ bool create_acceptor(ah_acceptor* result_acceptor,
       {INVALID_SOCKET},
   };
   return do_accept(&result_acceptor->base.overlapped);
+}
+
+/* I/O */
+
+void move_socket(ah_socket_accepted* result_socket, ah_socket_accepted* socket)
+{
+  if (result_socket == socket) {
+    return;
+  }
+
+  ah_socket_slot* slot =
+      (ah_socket_slot*)((char*)socket - offsetof(ah_socket_slot, socket));
+  if (slot->ok) {
+    memcpy(result_socket, socket, socket_size());
+    slot->ok = false;
+  }
 }
 
 /* Event loop */
