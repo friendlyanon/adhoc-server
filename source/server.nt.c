@@ -318,6 +318,14 @@ static bool do_accept(LPOVERLAPPED overlapped);
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+  {
+    ah_socket_slot slot = register_socket(
+        (ah_socket_slot) {true, acceptor->socket}, acceptor->server);
+    if (!slot.ok) {
+      return false;
+    }
+    acceptor->socket = slot.socket;
+  }
 
   LPSOCKADDR_IN local_address;
   int local_address_length;
