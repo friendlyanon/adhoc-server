@@ -15,6 +15,7 @@ typedef struct ah_socket_span {
 
 typedef struct ah_ipv4_address {
   uint8_t address[4];
+  uint16_t port;
 } ah_ipv4_address;
 
 typedef struct ah_socket_accepted {

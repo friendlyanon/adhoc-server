@@ -289,12 +289,13 @@ static bool accept_handler(ah_server* server,
   }
 
   uint32_t address_raw = ntohl(remote_address.sin_addr.s_addr);
-  ah_ipv4_address address = {{
-      address_raw >> 24 & 0xFF,
-      address_raw >> 16 & 0xFF,
-      address_raw >> 8 & 0xFF,
-      address_raw & 0xFF,
-  }};
+  ah_ipv4_address address = {
+      {address_raw >> 24 & 0xFF,
+       address_raw >> 16 & 0xFF,
+       address_raw >> 8 & 0xFF,
+       address_raw & 0xFF},
+      ntohs(remote_address.sin_port),
+  };
   /* TODO: Implement I/O for the handler */
   bool result = acceptor->on_accept(acceptor->user_data, address, &slot.socket);
   /* If ownership of the socket wasn't taken by the handler, then it gets

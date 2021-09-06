@@ -332,12 +332,13 @@ static bool accept_handler(LPOVERLAPPED overlapped)
                        (LPSOCKADDR*)&remote_address,
                        &remote_address_length);
   uint32_t address_raw = ntohl(remote_address->sin_addr.s_addr);
-  ah_ipv4_address address = {{
-      address_raw >> 24 & 0xFF,
-      address_raw >> 16 & 0xFF,
-      address_raw >> 8 & 0xFF,
-      address_raw & 0xFF,
-  }};
+  ah_ipv4_address address = {
+      {address_raw >> 24 & 0xFF,
+       address_raw >> 16 & 0xFF,
+       address_raw >> 8 & 0xFF,
+       address_raw & 0xFF},
+      ntohs(remote_address->sin_port),
+  };
   ah_socket_slot slot = {true, acceptor->socket};
   /* TODO: Implement I/O for the handler */
   bool result = acceptor->on_accept(acceptor->user_data, address, &slot.socket);

@@ -25,11 +25,12 @@ static bool on_accept(void* user_data,
 {
   (void)user_data;
 
-  printf("New connection from %d.%d.%d.%d\n",
-         (int)address.address[0],
-         (int)address.address[1],
-         (int)address.address[2],
-         (int)address.address[3]);
+  printf("New connection from %hhu.%hhu.%hhu.%hhu:%hu\n",
+         address.address[0],
+         address.address[1],
+         address.address[2],
+         address.address[3],
+         address.port);
 
   io_operation* op = malloc(sizeof(io_operation));
   if (op == NULL) {
