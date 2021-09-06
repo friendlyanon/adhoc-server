@@ -294,6 +294,7 @@ static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
 typedef struct ah_acceptor {
   ah_overlapped_base base;
   ah_on_accept on_accept;
+  void* user_data;
   ah_server* server;
   ah_socket listening_socket;
   ah_socket socket;
@@ -339,7 +340,7 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   }};
   ah_socket_slot slot = {true, acceptor->socket};
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(address, &slot.socket);
+  bool result = acceptor->on_accept(acceptor->user_data, address, &slot.socket);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -408,11 +409,13 @@ static bool do_accept(LPOVERLAPPED overlapped)
 bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_server* server,
                      ah_socket* listening_socket,
-                     ah_on_accept on_accept)
+                     ah_on_accept on_accept,
+                     void* user_data)
 {
   *result_acceptor = (ah_acceptor) {
       .base = {0},
       on_accept,
+      user_data,
       server,
       *listening_socket,
       {INVALID_SOCKET},

@@ -21,7 +21,9 @@ typedef struct ah_socket_accepted {
   uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
 } ah_socket_accepted;
 
-typedef bool (*ah_on_accept)(ah_ipv4_address address, ah_socket* socket);
+typedef bool (*ah_on_accept)(void* user_data,
+                             ah_ipv4_address address,
+                             ah_socket* socket);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -75,7 +77,8 @@ size_t acceptor_size(void);
 bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_server* server,
                      ah_socket* listening_socket,
-                     ah_on_accept on_accept);
+                     ah_on_accept on_accept,
+                     void* user_data);
 
 /**
  * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.

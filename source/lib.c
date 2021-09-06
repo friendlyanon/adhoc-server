@@ -19,8 +19,12 @@ typedef struct io_operation {
   ah_socket_accepted socket;
 } io_operation;
 
-static bool on_accept(ah_ipv4_address address, ah_socket* socket)
+static bool on_accept(void* user_data,
+                      ah_ipv4_address address,
+                      ah_socket* socket)
 {
+  (void)user_data;
+
   printf("New connection from %d.%d.%d.%d\n",
          (int)address.address[0],
          (int)address.address[1],
@@ -57,7 +61,7 @@ library create_library()
   set_socket_span(server, (ah_socket_span) {1, socket});
 
   ah_acceptor* acceptor = ez_malloc(acceptor_size());
-  if (!create_acceptor(acceptor, server, socket, on_accept)) {
+  if (!create_acceptor(acceptor, server, socket, on_accept, NULL)) {
     goto exit;
   }
 

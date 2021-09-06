@@ -242,6 +242,7 @@ bool destroy_socket_accepted(ah_socket_accepted* socket)
 typedef struct ah_acceptor {
   bool (*handler)(ah_server*, ah_acceptor*, ah_socket*);
   ah_on_accept on_accept;
+  void* user_data;
 } ah_acceptor;
 
 size_t acceptor_size()
@@ -295,7 +296,7 @@ static bool accept_handler(ah_server* server,
       address_raw & 0xFF,
   }};
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(address, &slot.socket);
+  bool result = acceptor->on_accept(acceptor->user_data, address, &slot.socket);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -308,13 +309,14 @@ static bool accept_handler(ah_server* server,
 bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_server* server,
                      ah_socket* listening_socket,
-                     ah_on_accept on_accept)
+                     ah_on_accept on_accept,
+                     void* user_data)
 {
   (void)server;
 
   listening_socket->pointer = result_acceptor;
 
-  *result_acceptor = (ah_acceptor) {accept_handler, on_accept};
+  *result_acceptor = (ah_acceptor) {accept_handler, on_accept, user_data};
   return true;
 }
 
