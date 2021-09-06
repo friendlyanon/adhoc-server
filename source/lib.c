@@ -19,7 +19,7 @@ typedef struct io_operation {
   ah_socket_accepted socket;
 } io_operation;
 
-static bool on_accept(ah_ipv4_address address, ah_socket_accepted* socket)
+static bool on_accept(ah_ipv4_address address, ah_socket* socket)
 {
   printf("New connection from %d.%d.%d.%d\n",
          (int)address.address[0],

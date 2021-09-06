@@ -295,7 +295,7 @@ static bool accept_handler(ah_server* server,
       address_raw & 0xFF,
   }};
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(address, (ah_socket_accepted*)&slot.socket);
+  bool result = acceptor->on_accept(address, &slot.socket);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -320,12 +320,8 @@ bool create_acceptor(ah_acceptor* result_acceptor,
 
 /* I/O */
 
-void move_socket(ah_socket_accepted* result_socket, ah_socket_accepted* socket)
+void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
 {
-  if (result_socket == socket) {
-    return;
-  }
-
   ah_socket_slot* slot =
       (ah_socket_slot*)((char*)socket - offsetof(ah_socket_slot, socket));
   if (slot->ok) {

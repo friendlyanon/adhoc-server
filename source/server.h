@@ -21,8 +21,7 @@ typedef struct ah_socket_accepted {
   uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
 } ah_socket_accepted;
 
-typedef bool (*ah_on_accept)(ah_ipv4_address address,
-                             ah_socket_accepted* socket);
+typedef bool (*ah_on_accept)(ah_ipv4_address address, ah_socket* socket);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -87,4 +86,4 @@ bool server_tick(ah_server* server);
  * @brief Takes the ownership of an accepted socket from the server in an
  * ::ah_on_accept callback.
  */
-void move_socket(ah_socket_accepted* result_socket, ah_socket_accepted* socket);
+void move_socket(ah_socket_accepted* result_socket, ah_socket* socket);
