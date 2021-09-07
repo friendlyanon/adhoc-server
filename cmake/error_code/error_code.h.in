@@ -1,0 +1,11 @@
+#pragma once
+
+typedef enum ah_error_code
+{
+  AH_ERR_@enums@,
+} ah_error_code;
+
+/**
+ * @brief Tells whether the error code is one that the client code can handle.
+ */
+bool is_ah_error_code(int value);
