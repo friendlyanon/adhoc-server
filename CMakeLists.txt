@@ -13,6 +13,7 @@ project(
 docs_early_return()
 
 include(cmake/project-is-top-level.cmake)
+include(cmake/functions.cmake)
 include(cmake/variables.cmake)
 
 # ---- Declare libraries ----
@@ -35,9 +36,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     )
   endif()
   set(ah_socket_accepted_size 56)
+  set(ah_error_code_category nt)
 else()
   target_sources(adhoc-server_server PRIVATE source/server.posix.c)
   set(ah_socket_accepted_size 16)
+  set(ah_error_code_category posix)
 endif()
 
 set(
@@ -49,10 +52,19 @@ target_compile_definitions(
     "AH_SOCKET_ACCEPTED_SIZE=${adhoc-server_AH_SOCKET_ACCEPTED_SIZE}"
 )
 
+set(
+    adhoc-server_ERROR_CODE_GENERATOR
+    "${PROJECT_SOURCE_DIR}/cmake/error_code/${ah_error_code_category}.c"
+    CACHE FILEPATH
+    "The C file to compile and run that generates a list of error code pairs"
+)
+generate_error_codes("${adhoc-server_ERROR_CODE_GENERATOR}")
+
 target_include_directories(
     adhoc-server_server ${adhoc-server_warning_guard}
     PUBLIC
     "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/source>"
+    "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/generated/error_code>"
 )
 
 target_compile_features(adhoc-server_server PUBLIC c_std_11)

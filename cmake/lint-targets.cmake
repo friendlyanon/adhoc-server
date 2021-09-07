@@ -1,5 +1,6 @@
 set(
     FORMAT_PATTERNS
+    cmake/error_code/*.c
     source/*.c source/*.h
     include/*.h
     test/*.c test/*.h
