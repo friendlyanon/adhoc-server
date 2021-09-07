@@ -42,19 +42,4 @@ function(generate_error_codes source)
   configure_file(
       cmake/error_code/error_code.h.in generated/error_code/error_code.h @ONLY
   )
-
-  unset(values)
-  foreach(pair IN LISTS output)
-    if(NOT DEFINED values)
-      # This way the OK value is skipped
-      set(values "")
-    else()
-      list(GET pair 1 value)
-      list(APPEND values "${value}")
-    endif()
-  endforeach()
-  list(JOIN values ",\n    " values)
-  configure_file(
-      cmake/error_code/error_code.c.in generated/error_code/error_code.c @ONLY
-  )
 endfunction()
