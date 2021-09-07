@@ -26,7 +26,7 @@ static void print_error(const char* function, int error_code)
   DWORD result =
       FormatMessageW(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                      NULL,
-                     error_code,
+                     (DWORD)error_code,
                      0,
                      error_message,
                      ERROR_MESSAGE_SIZE,
@@ -97,7 +97,7 @@ static ah_server_slot create_completion_port(ah_server_slot slot)
   HANDLE completion_port =
       CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
   if (completion_port == NULL) {
-    print_error("CreateIoCompletionPort", GetLastError());
+    print_error("CreateIoCompletionPort", (int)GetLastError());
     slot.ok = false;
   } else {
     slot.server.completion_port = completion_port;
@@ -199,7 +199,7 @@ static ah_socket_slot register_socket(ah_socket_slot slot, ah_server* server)
   HANDLE result =
       CreateIoCompletionPort(socket_handle, server->completion_port, 0, 0);
   if (result == NULL) {
-    print_error("CreateIoCompletionPort", GetLastError());
+    print_error("CreateIoCompletionPort", (int)GetLastError());
     slot.ok = false;
   }
 
@@ -372,7 +372,7 @@ static bool queue_accept_operation(HANDLE completion_port,
 {
   BOOL result = PostQueuedCompletionStatus(completion_port, 0, 0, overlapped);
   if (result == FALSE) {
-    print_error("PostQueuedCompletionStatus", GetLastError());
+    print_error("PostQueuedCompletionStatus", (int)GetLastError());
     return false;
   }
 
@@ -465,7 +465,7 @@ bool server_tick(ah_server* server)
                                           &overlapped,
                                           INFINITE);
   if (result == FALSE) {
-    print_error("GetQueuedCompletionStatus", GetLastError());
+    print_error("GetQueuedCompletionStatus", (int)GetLastError());
     return false;
   }
 
