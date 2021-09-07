@@ -59,6 +59,10 @@ set(
     "The C file to compile and run that generates a list of error code pairs"
 )
 generate_error_codes("${adhoc-server_ERROR_CODE_GENERATOR}")
+target_sources(
+    adhoc-server_server PRIVATE
+    "${PROJECT_BINARY_DIR}/generated/error_code/error_code.c"
+)
 
 target_include_directories(
     adhoc-server_server ${adhoc-server_warning_guard}

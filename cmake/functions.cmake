@@ -37,13 +37,59 @@ function(generate_error_codes source)
     message(FATAL_ERROR "Running the error code generator failed")
   endif()
 
-  set(error_code_content "#pragma once\n\ntypedef enum ah_error_code\n{\n")
-  foreach(pair IN LISTS output)
-    string(REPLACE ";" " = " pair "${pair}")
-    string(APPEND error_code_content "  AH_ERR_${pair},\n")
-  endforeach()
+  list(JOIN output ",\n  AH_ERR_" enums)
+  string(REPLACE ";" " = " enums "${enums}")
   file(
       GENERATE OUTPUT "${PROJECT_BINARY_DIR}/generated/error_code/error_code.h"
-      CONTENT "${error_code_content}} ah_error_code;\n"
+      CONTENT "\
+#pragma once
+
+typedef enum ah_error_code
+{
+  AH_ERR_${enums},
+} ah_error_code;
+
+/**
+ * @brief Tells whether the error code is one that the client code can handle.
+ */
+bool is_ah_error_code(int value);
+"
+  )
+
+  unset(values)
+  foreach(pair IN LISTS output)
+    if(NOT DEFINED values)
+      # This way the OK value is skipped
+      set(values "")
+    else()
+      list(GET pair 1 value)
+      list(APPEND values "${value}")
+    endif()
+  endforeach()
+  list(JOIN values ",\n    " values)
+  file(
+      GENERATE OUTPUT "${PROJECT_BINARY_DIR}/generated/error_code/error_code.c"
+      CONTENT "\
+#include <stdbool.h>
+
+#include \"error_code.h\"
+
+static const int values[] = {
+    ${values},
+};
+
+bool is_ah_error_code(int value)
+{
+  const int* begin = values;
+  const int* const end = &values[sizeof(values) / sizeof(int)];
+  do {
+    if (*begin == value) {
+      return true;
+    }
+  } while (++begin != end);
+
+  return false;
+}
+"
   )
 endfunction()
