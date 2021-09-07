@@ -123,9 +123,29 @@ void set_socket_span(ah_server* server, ah_socket_span span)
 
 /* Socket creation */
 
+typedef struct ah_overlapped_base {
+  OVERLAPPED overlapped;
+  bool (*handler)(LPOVERLAPPED);
+} ah_overlapped_base;
+
+static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
+{
+  char* base = (char*)overlapped - offsetof(ah_overlapped_base, overlapped);
+  return (ah_overlapped_base*)base;
+}
+
 typedef struct ah_socket {
   SOCKET socket;
+  ah_overlapped_base base;
+  void* on_complete;
 } ah_socket;
+
+static ah_socket* socket_from_overlapped(LPOVERLAPPED overlapped)
+{
+  char* acceptor =
+      (char*)base_from_overlapped(overlapped) - offsetof(ah_socket, base);
+  return (ah_socket*)acceptor;
+}
 
 _Static_assert(
     sizeof(ah_socket) == sizeof(ah_socket_accepted),
@@ -243,7 +263,7 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
 
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
-  ah_socket_slot slot = {true, {INVALID_SOCKET}};
+  ah_socket_slot slot = {true, {.socket = INVALID_SOCKET}};
   slot = create_unbound_socket(slot);
   slot = register_socket(slot, server);
   slot = socket_enable_address_reuse(slot);
@@ -278,33 +298,20 @@ bool destroy_socket_accepted(ah_socket_accepted* socket)
 
 /* Acceptor creation */
 
-typedef struct ah_overlapped_base {
-  OVERLAPPED overlapped;
-  bool (*handler)(LPOVERLAPPED);
-} ah_overlapped_base;
-
-static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
-{
-  char* base = (char*)overlapped - offsetof(ah_overlapped_base, overlapped);
-  return (ah_overlapped_base*)base;
-}
-
 #define ADDRESS_LENGTH ((DWORD)(sizeof(SOCKADDR_IN) + 16))
 
 typedef struct ah_acceptor {
-  ah_overlapped_base base;
-  ah_on_accept on_accept;
+  ah_socket listening_socket;
   void* user_data;
   ah_server* server;
-  ah_socket listening_socket;
   ah_socket socket;
   uint8_t output_buffer[ADDRESS_LENGTH * 2];
 } ah_acceptor;
 
 static ah_acceptor* acceptor_from_overlapped(LPOVERLAPPED overlapped)
 {
-  char* acceptor =
-      (char*)base_from_overlapped(overlapped) - offsetof(ah_acceptor, base);
+  char* acceptor = (char*)socket_from_overlapped(overlapped)
+      - offsetof(ah_acceptor, listening_socket);
   return (ah_acceptor*)acceptor;
 }
 
@@ -349,7 +356,8 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   };
   ah_socket_slot slot = {true, acceptor->socket};
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(acceptor->user_data, address, &slot.socket);
+  ah_on_accept on_accept = (ah_on_accept)acceptor->listening_socket.on_complete;
+  bool result = on_accept(acceptor->user_data, address, &slot.socket);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -375,8 +383,8 @@ static bool do_accept(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
   {
-    ah_socket_slot slot =
-        create_unbound_socket((ah_socket_slot) {true, {INVALID_SOCKET}});
+    ah_socket_slot slot = create_unbound_socket(
+        (ah_socket_slot) {true, {.socket = INVALID_SOCKET}});
     if (!slot.ok) {
       return false;
     }
@@ -400,7 +408,7 @@ static bool do_accept(LPOVERLAPPED overlapped)
     switch (error_code) {
       case WSAECONNRESET:
         destroy_socket(&acceptor->socket);
-        acceptor->base.handler = do_accept;
+        acceptor->listening_socket.base.handler = do_accept;
         return queue_accept_operation(acceptor->server->completion_port,
                                       overlapped);
       case ERROR_IO_PENDING:
@@ -411,7 +419,7 @@ static bool do_accept(LPOVERLAPPED overlapped)
     }
   }
 
-  acceptor->base.handler = accept_handler;
+  acceptor->listening_socket.base.handler = accept_handler;
   return true;
 }
 
@@ -422,14 +430,14 @@ bool create_acceptor(ah_acceptor* result_acceptor,
                      void* user_data)
 {
   *result_acceptor = (ah_acceptor) {
-      .base = {0},
-      on_accept,
+      *listening_socket,
       user_data,
       server,
-      *listening_socket,
-      {INVALID_SOCKET},
+      {.socket = INVALID_SOCKET},
+      {0},
   };
-  return do_accept(&result_acceptor->base.overlapped);
+  result_acceptor->listening_socket.on_complete = (void*)on_accept;
+  return do_accept(&result_acceptor->listening_socket.base.overlapped);
 }
 
 /* I/O */

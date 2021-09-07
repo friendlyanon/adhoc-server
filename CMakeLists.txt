@@ -34,7 +34,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         <MSWSock.h>
     )
   endif()
-  set(ah_socket_accepted_size 8)
+  set(ah_socket_accepted_size 56)
 else()
   target_sources(adhoc-server_server PRIVATE source/server.posix.c)
   set(ah_socket_accepted_size 16)
