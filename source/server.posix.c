@@ -297,7 +297,7 @@ static bool accept_handler(ah_server* server,
 
   ah_socket_slot slot = (ah_socket_slot) {
       .ok = true,
-      {incoming_socket, AH_SOCKET_IO},
+      {incoming_socket, AH_SOCKET_IO, NULL},
   };
   slot = socket_set_nonblocking(slot, false);
   if (!slot.ok) {
