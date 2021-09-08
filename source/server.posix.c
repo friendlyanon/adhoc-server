@@ -17,8 +17,8 @@
 
 typedef struct ah_server {
   ah_socket_span socket_span;
-  struct epoll_event events[MAX_EVENTS];
   int epoll_descriptor;
+  struct epoll_event events[MAX_EVENTS];
 } ah_server;
 
 size_t server_size()
