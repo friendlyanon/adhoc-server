@@ -244,7 +244,6 @@ bool destroy_socket_accepted(ah_socket_accepted* socket)
 /* Acceptor creation */
 
 typedef struct ah_acceptor {
-  bool (*handler)(ah_server*, ah_acceptor*, ah_socket*);
   ah_on_accept on_accept;
   void* user_data;
 } ah_acceptor;
@@ -335,7 +334,7 @@ bool create_acceptor(ah_acceptor* result_acceptor,
 
   listening_socket->pointer = result_acceptor;
 
-  *result_acceptor = (ah_acceptor) {accept_handler, on_accept, user_data};
+  *result_acceptor = (ah_acceptor) {on_accept, user_data};
   return true;
 }
 
@@ -371,7 +370,7 @@ bool server_tick(ah_server* server, int* error_code)
     ah_socket* socket = (ah_socket*)server->events[i].data.ptr;
     if (socket->role == AH_SOCKET_ACCEPT) {
       ah_acceptor* acceptor = (ah_acceptor*)socket->pointer;
-      if (!acceptor->handler(server, acceptor, socket)) {
+      if (!accept_handler(server, acceptor, socket)) {
         return false;
       }
     }
