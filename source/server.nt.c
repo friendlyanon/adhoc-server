@@ -1,6 +1,7 @@
 #include "server.nt.h"
 
 #include <MSWSock.h>
+#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <wctype.h>
@@ -469,5 +470,6 @@ bool server_tick(ah_server* server)
     return false;
   }
 
+  assert(overlapped != NULL);
   return base_from_overlapped(overlapped)->handler(overlapped);
 }
