@@ -24,9 +24,10 @@ typedef struct ah_socket_accepted {
   uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
 } ah_socket_accepted;
 
-typedef bool (*ah_on_accept)(void* user_data,
+typedef bool (*ah_on_accept)(ah_error_code error_code,
+                             ah_socket* socket,
                              ah_ipv4_address address,
-                             ah_socket* socket);
+                             void* user_data);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -85,8 +86,13 @@ bool create_acceptor(ah_acceptor* result_acceptor,
 
 /**
  * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.
+ *
+ * This function calls the platform dependent event loop function to dequeue
+ * events and dispatches on those events. If this function fails, then the OS
+ * native error code will be returned via the \c error_code parameter. If \c
+ * error_code is \c NULL, then the error will be printed to stderr.
  */
-bool server_tick(ah_server* server);
+bool server_tick(ah_server* server, int* error_code);
 
 /**
  * @brief Takes the ownership of an accepted socket from the server in an

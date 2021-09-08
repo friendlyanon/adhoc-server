@@ -168,7 +168,8 @@ size_t socket_size()
   return sizeof(ah_socket);
 }
 
-static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
+static ah_socket_slot create_unbound_socket(ah_socket_slot slot,
+                                            int* error_code)
 {
   if (!slot.ok) {
     return slot;
@@ -177,7 +178,12 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
   SOCKET unbound_socket = WSASocket(
       AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
   if (unbound_socket == INVALID_SOCKET) {
-    print_error("WSASocket", WSAGetLastError());
+    if (error_code == NULL) {
+      print_error("WSASocket", WSAGetLastError());
+    } else {
+      *error_code = WSAGetLastError();
+    }
+
     slot.ok = false;
   } else {
     slot.socket.socket = unbound_socket;
@@ -186,7 +192,9 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
   return slot;
 }
 
-static ah_socket_slot register_socket(ah_socket_slot slot, ah_server* server)
+static ah_socket_slot register_socket(ah_socket_slot slot,
+                                      ah_server* server,
+                                      int* error_code)
 {
   if (!slot.ok) {
     return slot;
@@ -200,7 +208,12 @@ static ah_socket_slot register_socket(ah_socket_slot slot, ah_server* server)
   HANDLE result =
       CreateIoCompletionPort(socket_handle, server->completion_port, 0, 0);
   if (result == NULL) {
-    print_error("CreateIoCompletionPort", (int)GetLastError());
+    if (error_code == NULL) {
+      print_error("CreateIoCompletionPort", (int)GetLastError());
+    } else {
+      *error_code = (int)GetLastError();
+    }
+
     slot.ok = false;
   }
 
@@ -265,8 +278,8 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
 bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
   ah_socket_slot slot = {true, {.socket = INVALID_SOCKET}};
-  slot = create_unbound_socket(slot);
-  slot = register_socket(slot, server);
+  slot = create_unbound_socket(slot, NULL);
+  slot = register_socket(slot, server, NULL);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
@@ -321,16 +334,42 @@ size_t acceptor_size()
   return sizeof(ah_acceptor);
 }
 
+static ah_on_accept on_accept_from_acceptor(ah_acceptor* acceptor)
+{
+  return (ah_on_accept)acceptor->listening_socket.on_complete;
+}
+
+static bool accept_error_handler(ah_acceptor* acceptor,
+                                 const char* function,
+                                 int error_code)
+{
+  if (is_ah_error_code(error_code)) {
+    ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
+    ah_socket_slot slot = {0};
+    return on_accept((ah_error_code)error_code,
+                     &slot.socket,
+                     (ah_ipv4_address) {0},
+                     acceptor->user_data);
+  }
+
+  print_error(function, error_code);
+  return false;
+}
+
 static bool do_accept(LPOVERLAPPED overlapped);
 
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
   {
-    ah_socket_slot slot = register_socket(
-        (ah_socket_slot) {true, acceptor->socket}, acceptor->server);
+    int error_code;
+    ah_socket_slot slot =
+        register_socket((ah_socket_slot) {true, acceptor->socket},
+                        acceptor->server,
+                        &error_code);
     if (!slot.ok) {
-      return false;
+      return accept_error_handler(
+          acceptor, "CreateIoCompletionPort", error_code);
     }
     acceptor->socket = slot.socket;
   }
@@ -357,8 +396,9 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   };
   ah_socket_slot slot = {true, acceptor->socket};
   /* TODO: Implement I/O for the handler */
-  ah_on_accept on_accept = (ah_on_accept)acceptor->listening_socket.on_complete;
-  bool result = on_accept(acceptor->user_data, address, &slot.socket);
+  ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
+  bool result =
+      on_accept(AH_ERR_OK, &slot.socket, address, acceptor->user_data);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -368,8 +408,7 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   return result ? do_accept(overlapped) : false;
 }
 
-static bool queue_accept_operation(HANDLE completion_port,
-                                   LPOVERLAPPED overlapped)
+static bool queue_overlapped(HANDLE completion_port, LPOVERLAPPED overlapped)
 {
   BOOL result = PostQueuedCompletionStatus(completion_port, 0, 0, overlapped);
   if (result == FALSE) {
@@ -384,39 +423,45 @@ static bool do_accept(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
   {
+    int error_code;
     ah_socket_slot slot = create_unbound_socket(
-        (ah_socket_slot) {true, {.socket = INVALID_SOCKET}});
+        (ah_socket_slot) {true, {.socket = INVALID_SOCKET}}, &error_code);
     if (!slot.ok) {
-      return false;
+      return accept_error_handler(acceptor, "WSASocket", error_code);
     }
     acceptor->socket = slot.socket;
   }
 
   DWORD bytes_read;
-  BOOL result = AcceptEx(acceptor->listening_socket.socket,
-                         acceptor->socket.socket,
-                         acceptor->output_buffer,
-                         0,
-                         ADDRESS_LENGTH,
-                         ADDRESS_LENGTH,
-                         &bytes_read,
-                         overlapped);
-  if (result == FALSE) {
+  BOOL accept_result = AcceptEx(acceptor->listening_socket.socket,
+                                acceptor->socket.socket,
+                                acceptor->output_buffer,
+                                0,
+                                ADDRESS_LENGTH,
+                                ADDRESS_LENGTH,
+                                &bytes_read,
+                                overlapped);
+  if (accept_result == FALSE) {
     int error_code = WSAGetLastError();
-    /* If the error is WSAECONNRESET, an incoming connection was indicated, but
-     * was subsequently terminated by the remote peer prior to accepting the
-     * call. */
-    switch (error_code) {
-      case WSAECONNRESET:
-        destroy_socket(&acceptor->socket);
-        acceptor->listening_socket.base.handler = do_accept;
-        return queue_accept_operation(acceptor->server->completion_port,
-                                      overlapped);
-      case ERROR_IO_PENDING:
-        break;
-      default:
+    if (error_code != ERROR_IO_PENDING) {
+      if (!is_ah_error_code(error_code)) {
         print_error("AcceptEx", error_code);
         return false;
+      }
+
+      ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
+      ah_socket_slot slot = {0};
+      bool result = on_accept((ah_error_code)error_code,
+                              &slot.socket,
+                              (ah_ipv4_address) {0},
+                              acceptor->user_data);
+      destroy_socket(&acceptor->socket);
+      if (!result) {
+        return false;
+      }
+
+      acceptor->listening_socket.base.handler = do_accept;
+      return queue_overlapped(acceptor->server->completion_port, overlapped);
     }
   }
 
@@ -455,7 +500,7 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
 
 /* Event loop */
 
-bool server_tick(ah_server* server)
+bool server_tick(ah_server* server, int* error_code)
 {
   DWORD bytes_transferred;
   ULONG_PTR completion_key;
@@ -466,10 +511,16 @@ bool server_tick(ah_server* server)
                                           &overlapped,
                                           INFINITE);
   if (result == FALSE) {
-    print_error("GetQueuedCompletionStatus", (int)GetLastError());
+    if (error_code == NULL) {
+      print_error("GetQueuedCompletionStatus", (int)GetLastError());
+    } else {
+      *error_code = (int)GetLastError();
+    }
+
     return false;
   }
 
   assert(overlapped != NULL);
-  return base_from_overlapped(overlapped)->handler(overlapped);
+  ah_overlapped_base* base = base_from_overlapped(overlapped);
+  return base->handler(overlapped);
 }

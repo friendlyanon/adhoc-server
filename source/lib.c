@@ -19,10 +19,12 @@ typedef struct io_operation {
   ah_socket_accepted socket;
 } io_operation;
 
-static bool on_accept(void* user_data,
+static bool on_accept(ah_error_code error_code,
+                      ah_socket* socket,
                       ah_ipv4_address address,
-                      ah_socket* socket)
+                      void* user_data)
 {
+  (void)error_code;
   (void)user_data;
 
   printf("New connection from %hhu.%hhu.%hhu.%hhu:%hu\n",
@@ -67,7 +69,7 @@ library create_library()
   }
 
   while (1) {
-    if (!server_tick(server)) {
+    if (!server_tick(server, NULL)) {
       goto exit;
     }
   }

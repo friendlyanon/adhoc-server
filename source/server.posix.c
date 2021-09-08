@@ -1,6 +1,7 @@
 #include "server.h"
 
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -110,7 +111,7 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
   return slot;
 }
 
-static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot)
+static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot, bool report)
 {
   if (!slot.ok) {
     return slot;
@@ -119,7 +120,10 @@ static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot)
   int socket_descriptor = slot.socket.socket;
   int flags = fcntl(socket_descriptor, F_GETFL);
   if (flags < 0 || fcntl(socket_descriptor, F_SETFL, flags | O_NONBLOCK) < 0) {
-    perror("fcntl");
+    if (report) {
+      perror("fcntl");
+    }
+
     slot.ok = false;
   }
 
@@ -205,7 +209,7 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 {
   ah_socket_slot slot = {true, {-1, AH_SOCKET_ACCEPT, NULL}};
   slot = create_unbound_socket(slot);
-  slot = socket_set_nonblocking(slot);
+  slot = socket_set_nonblocking(slot, true);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
@@ -250,6 +254,21 @@ size_t acceptor_size()
   return sizeof(ah_acceptor);
 }
 
+static bool accept_error_handler(ah_acceptor* acceptor, const char* function)
+{
+  int error_code = errno;
+  if (!is_ah_error_code(error_code)) {
+    perror(function);
+    return false;
+  }
+
+  ah_socket_slot slot = {0};
+  return acceptor->on_accept((ah_error_code)error_code,
+                             &slot.socket,
+                             (ah_ipv4_address) {0},
+                             acceptor->user_data);
+}
+
 static bool accept_handler(ah_server* server,
                            ah_acceptor* acceptor,
                            ah_socket* socket)
@@ -260,8 +279,7 @@ static bool accept_handler(ah_server* server,
                                (struct sockaddr*)&remote_address,
                                &remote_address_length);
   if (incoming_socket == -1) {
-    perror("accept");
-    return false;
+    return accept_error_handler(acceptor, "accept");
   }
 
 #ifndef EPOLLEXCLUSIVE
@@ -271,8 +289,7 @@ static bool accept_handler(ah_server* server,
     int result = epoll_ctl(
         server->epoll_descriptor, EPOLL_CTL_MOD, socket->socket, &event);
     if (result == -1) {
-      perror("epoll_ctl");
-      return false;
+      return accept_error_handler(acceptor, "epoll_ctl");
     }
   }
 #else
@@ -283,9 +300,9 @@ static bool accept_handler(ah_server* server,
       .ok = true,
       {incoming_socket, AH_SOCKET_IO},
   };
-  slot = socket_set_nonblocking(slot);
+  slot = socket_set_nonblocking(slot, false);
   if (!slot.ok) {
-    return false;
+    return accept_error_handler(acceptor, "fcntl");
   }
 
   uint32_t address_raw = ntohl(remote_address.sin_addr.s_addr);
@@ -297,7 +314,8 @@ static bool accept_handler(ah_server* server,
       ntohs(remote_address.sin_port),
   };
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(acceptor->user_data, address, &slot.socket);
+  bool result = acceptor->on_accept(
+      AH_ERR_OK, &slot.socket, address, acceptor->user_data);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -335,12 +353,17 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
 
 /* Event loop */
 
-bool server_tick(ah_server* server)
+bool server_tick(ah_server* server, int* error_code)
 {
   int new_events =
       epoll_wait(server->epoll_descriptor, server->events, MAX_EVENTS, -1);
   if (new_events == -1) {
-    perror("epoll_wait");
+    if (error_code == NULL) {
+      perror("epoll_wait");
+    } else {
+      *error_code = errno;
+    }
+
     return false;
   }
 
