@@ -58,13 +58,25 @@ bool create_socket(ah_socket* result_socket,
 /**
  * @brief Closes the provided socket.
  */
-bool destroy_socket(ah_socket* socket);
+bool destroy_socket_base(ah_socket* socket);
 
 /**
  * @brief Closes the provided socket that was taken ownership of in an accept
  * handler.
  */
 bool destroy_socket_accepted(ah_socket_accepted* socket);
+
+/* clang-format off */
+
+/**
+ * @brief Type generic macro function that destroys the socket.
+ */
+#define destroy_socket(socket) \
+  _Generic((socket), \
+           ah_socket*: destroy_socket_base, \
+           ah_socket_accepted*: destroy_socket_accepted)(socket)
+
+/* clang-format on */
 
 /**
  * @brief Sets the internal socket span to the one provided.
@@ -107,9 +119,21 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket);
 /**
  * @brief Returns the ::ah_context pointer from the socket.
  */
-ah_context* context_from_socket(ah_socket* socket);
+ah_context* context_from_socket_base(ah_socket* socket);
 
 /**
  * @brief Returns the ::ah_context pointer from the accepted socket.
  */
 ah_context* context_from_socket_accepted(ah_socket_accepted* socket);
+
+/* clang-format off */
+
+/**
+ * @brief Type generic macro function that returns the context from the socket.
+ */
+#define context_from_socket(socket) \
+  _Generic((socket), \
+           ah_socket*: context_from_socket_base, \
+           ah_socket_accepted*: context_from_socket_accepted)(socket)
+
+/* clang-format on */

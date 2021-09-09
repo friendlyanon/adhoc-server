@@ -39,7 +39,7 @@ static bool on_accept(ah_error_code error_code,
 
   move_socket(&op->socket, socket);
 
-  bool result = destroy_socket_accepted(&op->socket);
+  bool result = destroy_socket(&op->socket);
   free(op);
 
   return result;

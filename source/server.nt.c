@@ -296,19 +296,19 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
 
 /* Context retrieval */
 
-ah_context* context_from_socket(ah_socket* socket)
+ah_context* context_from_socket_base(ah_socket* socket)
 {
   return socket->context;
 }
 
 ah_context* context_from_socket_accepted(ah_socket_accepted* socket)
 {
-  return context_from_socket((ah_socket*)socket);
+  return context_from_socket_base((ah_socket*)socket);
 }
 
 /* Socket destruction */
 
-bool destroy_socket(ah_socket* socket)
+bool destroy_socket_base(ah_socket* socket)
 {
   if (socket->socket == INVALID_SOCKET) {
     return true;
@@ -325,7 +325,7 @@ bool destroy_socket(ah_socket* socket)
 
 bool destroy_socket_accepted(ah_socket_accepted* socket)
 {
-  return destroy_socket((ah_socket*)socket);
+  return destroy_socket_base((ah_socket*)socket);
 }
 
 /* Acceptor creation */
