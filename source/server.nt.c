@@ -290,8 +290,10 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 
 /* Socket destruction */
 
-bool destroy_socket(ah_socket* socket)
+bool destroy_socket(ah_server* server, ah_socket* socket)
 {
+  (void)server;
+
   if (socket->socket == INVALID_SOCKET) {
     return true;
   }
@@ -305,9 +307,9 @@ bool destroy_socket(ah_socket* socket)
   return true;
 }
 
-bool destroy_socket_accepted(ah_socket_accepted* socket)
+bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket)
 {
-  return destroy_socket((ah_socket*)socket);
+  return destroy_socket(server, (ah_socket*)socket);
 }
 
 /* Acceptor creation */
@@ -347,6 +349,7 @@ static bool accept_error_handler(ah_acceptor* acceptor,
     ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
     ah_socket_slot slot = {0};
     return on_accept((ah_error_code)error_code,
+                     acceptor->server,
                      &slot.socket,
                      (ah_ipv4_address) {0},
                      acceptor->user_data);
@@ -361,12 +364,11 @@ static bool do_accept(LPOVERLAPPED overlapped);
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+  ah_server* server = acceptor->server;
   {
     int error_code;
-    ah_socket_slot slot =
-        register_socket((ah_socket_slot) {true, acceptor->socket},
-                        acceptor->server,
-                        &error_code);
+    ah_socket_slot slot = register_socket(
+        (ah_socket_slot) {true, acceptor->socket}, server, &error_code);
     if (!slot.ok) {
       return accept_error_handler(
           acceptor, "CreateIoCompletionPort", error_code);
@@ -398,11 +400,11 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   /* TODO: Implement I/O for the handler */
   ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
   bool result =
-      on_accept(AH_ERR_OK, &slot.socket, address, acceptor->user_data);
+      on_accept(AH_ERR_OK, server, &slot.socket, address, acceptor->user_data);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
-    result = destroy_socket(&slot.socket) && result;
+    result = destroy_socket(server, &slot.socket) && result;
   }
 
   return result ? do_accept(overlapped) : false;
@@ -449,19 +451,21 @@ static bool do_accept(LPOVERLAPPED overlapped)
         return false;
       }
 
+      ah_server* server = acceptor->server;
       ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
       ah_socket_slot slot = {0};
       bool result = on_accept((ah_error_code)error_code,
+                              server,
                               &slot.socket,
                               (ah_ipv4_address) {0},
                               acceptor->user_data);
-      destroy_socket(&acceptor->socket);
+      destroy_socket(server, &acceptor->socket);
       if (!result) {
         return false;
       }
 
       acceptor->listening_socket.base.handler = do_accept;
-      return queue_overlapped(acceptor->server->completion_port, overlapped);
+      return queue_overlapped(server->completion_port, overlapped);
     }
   }
 

@@ -20,6 +20,7 @@ typedef struct io_operation {
 } io_operation;
 
 static bool on_accept(ah_error_code error_code,
+                      ah_server* server,
                       ah_socket* socket,
                       ah_ipv4_address address,
                       void* user_data)
@@ -41,7 +42,7 @@ static bool on_accept(ah_error_code error_code,
 
   move_socket(&op->socket, socket);
 
-  bool result = destroy_socket_accepted(&op->socket);
+  bool result = destroy_socket_accepted(server, &op->socket);
   free(op);
 
   return result;

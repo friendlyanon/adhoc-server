@@ -221,10 +221,17 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
 
 /* Socket destruction */
 
-bool destroy_socket(ah_socket* socket)
+bool destroy_socket(ah_server* server, ah_socket* socket)
 {
   if (socket->socket == -1) {
     return true;
+  }
+
+  int result =
+      epoll_ctl(server->epoll_descriptor, EPOLL_CTL_DEL, socket->socket, NULL);
+  if (result == -1 && errno != ENOENT) {
+    perror("epoll_ctl");
+    return false;
   }
 
   if (close(socket->socket) != 0) {
@@ -236,9 +243,9 @@ bool destroy_socket(ah_socket* socket)
   return true;
 }
 
-bool destroy_socket_accepted(ah_socket_accepted* socket)
+bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket)
 {
-  return destroy_socket((ah_socket*)socket);
+  return destroy_socket(server, (ah_socket*)socket);
 }
 
 /* Acceptor creation */
@@ -253,7 +260,9 @@ size_t acceptor_size()
   return sizeof(ah_acceptor);
 }
 
-static bool accept_error_handler(ah_acceptor* acceptor, const char* function)
+static bool accept_error_handler(ah_server* server,
+                                 ah_acceptor* acceptor,
+                                 const char* function)
 {
   int error_code = errno;
   if (!is_ah_error_code(error_code)) {
@@ -263,6 +272,7 @@ static bool accept_error_handler(ah_acceptor* acceptor, const char* function)
 
   ah_socket_slot slot = {0};
   return acceptor->on_accept((ah_error_code)error_code,
+                             server,
                              &slot.socket,
                              (ah_ipv4_address) {0},
                              acceptor->user_data);
@@ -278,7 +288,7 @@ static bool accept_handler(ah_server* server,
                                (struct sockaddr*)&remote_address,
                                &remote_address_length);
   if (incoming_socket == -1) {
-    return accept_error_handler(acceptor, "accept");
+    return accept_error_handler(server, acceptor, "accept");
   }
 
 #ifndef EPOLLEXCLUSIVE
@@ -288,11 +298,9 @@ static bool accept_handler(ah_server* server,
     int result = epoll_ctl(
         server->epoll_descriptor, EPOLL_CTL_MOD, socket->socket, &event);
     if (result == -1) {
-      return accept_error_handler(acceptor, "epoll_ctl");
+      return accept_error_handler(server, acceptor, "epoll_ctl");
     }
   }
-#else
-  (void)server;
 #endif
 
   ah_socket_slot slot = (ah_socket_slot) {
@@ -301,7 +309,7 @@ static bool accept_handler(ah_server* server,
   };
   slot = socket_set_nonblocking(slot, false);
   if (!slot.ok) {
-    return accept_error_handler(acceptor, "fcntl");
+    return accept_error_handler(server, acceptor, "fcntl");
   }
 
   uint32_t address_raw = ntohl(remote_address.sin_addr.s_addr);
@@ -314,11 +322,11 @@ static bool accept_handler(ah_server* server,
   };
   /* TODO: Implement I/O for the handler */
   bool result = acceptor->on_accept(
-      AH_ERR_OK, &slot.socket, address, acceptor->user_data);
+      AH_ERR_OK, server, &slot.socket, address, acceptor->user_data);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
-    result = destroy_socket(&slot.socket) && result;
+    result = destroy_socket(server, &slot.socket) && result;
   }
 
   return result;

@@ -25,6 +25,7 @@ typedef struct ah_socket_accepted {
 } ah_socket_accepted;
 
 typedef bool (*ah_on_accept)(ah_error_code error_code,
+                             ah_server* server,
                              ah_socket* socket,
                              ah_ipv4_address address,
                              void* user_data);
@@ -52,13 +53,13 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port);
 /**
  * @brief Closes the provided socket.
  */
-bool destroy_socket(ah_socket* socket);
+bool destroy_socket(ah_server* server, ah_socket* socket);
 
 /**
  * @brief Closes the provided socket that was taken ownership of in an accept
  * handler.
  */
-bool destroy_socket_accepted(ah_socket_accepted* socket);
+bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket);
 
 /**
  * @brief Sets the internal socket span to the one provided.
