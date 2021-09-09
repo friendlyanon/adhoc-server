@@ -138,6 +138,7 @@ static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
 typedef struct ah_socket {
   SOCKET socket;
   ah_overlapped_base base;
+  ah_context* context;
   void* on_complete;
 } ah_socket;
 
@@ -193,7 +194,7 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot,
 }
 
 static ah_socket_slot register_socket(ah_socket_slot slot,
-                                      ah_server* server,
+                                      ah_context* context,
                                       int* error_code)
 {
   if (!slot.ok) {
@@ -205,8 +206,8 @@ static ah_socket_slot register_socket(ah_socket_slot slot,
   HANDLE socket_handle = NULL;
   memcpy(&socket_handle, &slot.socket.socket, sizeof(SOCKET));
 
-  HANDLE result =
-      CreateIoCompletionPort(socket_handle, server->completion_port, 0, 0);
+  HANDLE completion_port = context->server->completion_port;
+  HANDLE result = CreateIoCompletionPort(socket_handle, completion_port, 0, 0);
   if (result == NULL) {
     if (error_code == NULL) {
       print_error("CreateIoCompletionPort", (int)GetLastError());
@@ -275,11 +276,16 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
   return slot;
 }
 
-bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
+static ah_socket make_socket(ah_context* context)
 {
-  ah_socket_slot slot = {true, {.socket = INVALID_SOCKET}};
+  return (ah_socket) {.socket = INVALID_SOCKET, .context = context};
+}
+
+bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
+{
+  ah_socket_slot slot = {true, make_socket(context)};
   slot = create_unbound_socket(slot, NULL);
-  slot = register_socket(slot, server, NULL);
+  slot = register_socket(slot, context, NULL);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
@@ -288,12 +294,22 @@ bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
   return slot.ok;
 }
 
+/* Context retrieval */
+
+ah_context* context_from_socket(ah_socket* socket)
+{
+  return socket->context;
+}
+
+ah_context* context_from_socket_accepted(ah_socket_accepted* socket)
+{
+  return context_from_socket((ah_socket*)socket);
+}
+
 /* Socket destruction */
 
-bool destroy_socket(ah_server* server, ah_socket* socket)
+bool destroy_socket(ah_socket* socket)
 {
-  (void)server;
-
   if (socket->socket == INVALID_SOCKET) {
     return true;
   }
@@ -307,9 +323,9 @@ bool destroy_socket(ah_server* server, ah_socket* socket)
   return true;
 }
 
-bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket)
+bool destroy_socket_accepted(ah_socket_accepted* socket)
 {
-  return destroy_socket(server, (ah_socket*)socket);
+  return destroy_socket((ah_socket*)socket);
 }
 
 /* Acceptor creation */
@@ -318,8 +334,6 @@ bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket)
 
 typedef struct ah_acceptor {
   ah_socket listening_socket;
-  void* user_data;
-  ah_server* server;
   ah_socket socket;
   uint8_t output_buffer[ADDRESS_LENGTH * 2];
 } ah_acceptor;
@@ -345,18 +359,16 @@ static bool accept_error_handler(ah_acceptor* acceptor,
                                  const char* function,
                                  int error_code)
 {
-  if (is_ah_error_code(error_code)) {
-    ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
-    ah_socket_slot slot = {0};
-    return on_accept((ah_error_code)error_code,
-                     acceptor->server,
-                     &slot.socket,
-                     (ah_ipv4_address) {0},
-                     acceptor->user_data);
+  if (!is_ah_error_code(error_code)) {
+    print_error(function, error_code);
+    return false;
   }
 
-  print_error(function, error_code);
-  return false;
+  ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
+  ah_context* context = acceptor->listening_socket.context;
+  ah_socket_slot slot = {false, {.context = context}};
+  return on_accept(
+      (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
 }
 
 static bool do_accept(LPOVERLAPPED overlapped);
@@ -364,11 +376,12 @@ static bool do_accept(LPOVERLAPPED overlapped);
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
-  ah_server* server = acceptor->server;
   {
     int error_code;
-    ah_socket_slot slot = register_socket(
-        (ah_socket_slot) {true, acceptor->socket}, server, &error_code);
+    ah_socket_slot slot =
+        register_socket((ah_socket_slot) {true, acceptor->socket},
+                        acceptor->listening_socket.context,
+                        &error_code);
     if (!slot.ok) {
       return accept_error_handler(
           acceptor, "CreateIoCompletionPort", error_code);
@@ -399,12 +412,11 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   ah_socket_slot slot = {true, acceptor->socket};
   /* TODO: Implement I/O for the handler */
   ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
-  bool result =
-      on_accept(AH_ERR_OK, server, &slot.socket, address, acceptor->user_data);
+  bool result = on_accept(AH_ERR_OK, &slot.socket, address);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
-    result = destroy_socket(server, &slot.socket) && result;
+    result = destroy_socket(&slot.socket) && result;
   }
 
   return result ? do_accept(overlapped) : false;
@@ -424,10 +436,11 @@ static bool queue_overlapped(HANDLE completion_port, LPOVERLAPPED overlapped)
 static bool do_accept(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+  ah_context* context = acceptor->listening_socket.context;
   {
     int error_code;
     ah_socket_slot slot = create_unbound_socket(
-        (ah_socket_slot) {true, {.socket = INVALID_SOCKET}}, &error_code);
+        (ah_socket_slot) {true, make_socket(context)}, &error_code);
     if (!slot.ok) {
       return accept_error_handler(acceptor, "WSASocket", error_code);
     }
@@ -451,21 +464,17 @@ static bool do_accept(LPOVERLAPPED overlapped)
         return false;
       }
 
-      ah_server* server = acceptor->server;
       ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
-      ah_socket_slot slot = {0};
-      bool result = on_accept((ah_error_code)error_code,
-                              server,
-                              &slot.socket,
-                              (ah_ipv4_address) {0},
-                              acceptor->user_data);
-      destroy_socket(server, &acceptor->socket);
+      ah_socket_slot slot = {false, {.context = context}};
+      bool result = on_accept(
+          (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
+      destroy_socket(&acceptor->socket);
       if (!result) {
         return false;
       }
 
       acceptor->listening_socket.base.handler = do_accept;
-      return queue_overlapped(server->completion_port, overlapped);
+      return queue_overlapped(context->server->completion_port, overlapped);
     }
   }
 
@@ -474,18 +483,10 @@ static bool do_accept(LPOVERLAPPED overlapped)
 }
 
 bool create_acceptor(ah_acceptor* result_acceptor,
-                     ah_server* server,
                      ah_socket* listening_socket,
-                     ah_on_accept on_accept,
-                     void* user_data)
+                     ah_on_accept on_accept)
 {
-  *result_acceptor = (ah_acceptor) {
-      *listening_socket,
-      user_data,
-      server,
-      {.socket = INVALID_SOCKET},
-      {0},
-  };
+  *result_acceptor = (ah_acceptor) {.listening_socket = *listening_socket};
   result_acceptor->listening_socket.on_complete = (void*)on_accept;
   return do_accept(&result_acceptor->listening_socket.base.overlapped);
 }

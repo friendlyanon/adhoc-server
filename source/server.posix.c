@@ -71,6 +71,7 @@ typedef enum ah_socket_role
 typedef struct ah_socket {
   int socket;
   ah_socket_role role;
+  ah_context* context;
   void* pointer;
 } ah_socket;
 
@@ -182,7 +183,7 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
 }
 
 static ah_socket_slot queue_socket(ah_socket_slot slot,
-                                   ah_server* server,
+                                   ah_context* context,
                                    ah_socket* result_socket)
 {
   if (!slot.ok) {
@@ -190,7 +191,7 @@ static ah_socket_slot queue_socket(ah_socket_slot slot,
   }
 
   int socket = slot.socket.socket;
-  int epoll_descriptor = server->epoll_descriptor;
+  int epoll_descriptor = context->server->epoll_descriptor;
 #ifdef EPOLLEXCLUSIVE
   uint32_t events = EPOLLIN | EPOLLEXCLUSIVE;
 #else
@@ -205,28 +206,41 @@ static ah_socket_slot queue_socket(ah_socket_slot slot,
   return slot;
 }
 
-bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port)
+bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
 {
-  ah_socket_slot slot = {true, {-1, AH_SOCKET_ACCEPT, NULL}};
+  ah_socket_slot slot = {true, {-1, AH_SOCKET_ACCEPT, context, NULL}};
   slot = create_unbound_socket(slot);
   slot = socket_set_nonblocking(slot, true);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
-  slot = queue_socket(slot, server, result_socket);
+  slot = queue_socket(slot, context, result_socket);
 
   memcpy(result_socket, &slot.socket, socket_size());
   return slot.ok;
 }
 
+/* Context retrieval */
+
+ah_context* context_from_socket(ah_socket* socket)
+{
+  return socket->context;
+}
+
+ah_context* context_from_socket_accepted(ah_socket_accepted* socket)
+{
+  return context_from_socket((ah_socket*)socket);
+}
+
 /* Socket destruction */
 
-bool destroy_socket(ah_server* server, ah_socket* socket)
+bool destroy_socket(ah_socket* socket)
 {
   if (socket->socket == -1) {
     return true;
   }
 
+  ah_server* server = context_from_socket(socket)->server;
   int result =
       epoll_ctl(server->epoll_descriptor, EPOLL_CTL_DEL, socket->socket, NULL);
   if (result == -1 && errno != ENOENT) {
@@ -243,16 +257,15 @@ bool destroy_socket(ah_server* server, ah_socket* socket)
   return true;
 }
 
-bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket)
+bool destroy_socket_accepted(ah_socket_accepted* socket)
 {
-  return destroy_socket(server, (ah_socket*)socket);
+  return destroy_socket((ah_socket*)socket);
 }
 
 /* Acceptor creation */
 
 typedef struct ah_acceptor {
   ah_on_accept on_accept;
-  void* user_data;
 } ah_acceptor;
 
 size_t acceptor_size()
@@ -260,8 +273,8 @@ size_t acceptor_size()
   return sizeof(ah_acceptor);
 }
 
-static bool accept_error_handler(ah_server* server,
-                                 ah_acceptor* acceptor,
+static bool accept_error_handler(ah_context* context,
+                                 ah_on_accept on_accept,
                                  const char* function)
 {
   int error_code = errno;
@@ -270,46 +283,44 @@ static bool accept_error_handler(ah_server* server,
     return false;
   }
 
-  ah_socket_slot slot = {0};
-  return acceptor->on_accept((ah_error_code)error_code,
-                             server,
-                             &slot.socket,
-                             (ah_ipv4_address) {0},
-                             acceptor->user_data);
+  ah_socket_slot slot = {false, {.context = context}};
+  return on_accept(
+      (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
 }
 
-static bool accept_handler(ah_server* server,
-                           ah_acceptor* acceptor,
-                           ah_socket* socket)
+static bool accept_handler(ah_on_accept on_accept, ah_socket* socket)
 {
+  ah_context* context = context_from_socket(socket);
   struct sockaddr_in remote_address = {0};
   socklen_t remote_address_length = sizeof(remote_address);
   int incoming_socket = accept(socket->socket,
                                (struct sockaddr*)&remote_address,
                                &remote_address_length);
   if (incoming_socket == -1) {
-    return accept_error_handler(server, acceptor, "accept");
+    return accept_error_handler(context, on_accept, "accept");
   }
 
 #ifndef EPOLLEXCLUSIVE
   {
     uint32_t events = EPOLLIN | EPOLLET | EPOLLONESHOT;
     struct epoll_event event = {events, .data.ptr = socket};
-    int result = epoll_ctl(
-        server->epoll_descriptor, EPOLL_CTL_MOD, socket->socket, &event);
+    int result = epoll_ctl(context->server->epoll_descriptor,
+                           EPOLL_CTL_MOD,
+                           socket->socket,
+                           &event);
     if (result == -1) {
-      return accept_error_handler(server, acceptor, "epoll_ctl");
+      return accept_error_handler(context, on_accept, "epoll_ctl");
     }
   }
 #endif
 
   ah_socket_slot slot = (ah_socket_slot) {
       .ok = true,
-      {incoming_socket, AH_SOCKET_IO, NULL},
+      {incoming_socket, AH_SOCKET_IO, context, NULL},
   };
   slot = socket_set_nonblocking(slot, false);
   if (!slot.ok) {
-    return accept_error_handler(server, acceptor, "fcntl");
+    return accept_error_handler(context, on_accept, "fcntl");
   }
 
   uint32_t address_raw = ntohl(remote_address.sin_addr.s_addr);
@@ -321,28 +332,22 @@ static bool accept_handler(ah_server* server,
       ntohs(remote_address.sin_port),
   };
   /* TODO: Implement I/O for the handler */
-  bool result = acceptor->on_accept(
-      AH_ERR_OK, server, &slot.socket, address, acceptor->user_data);
+  bool result = on_accept(AH_ERR_OK, &slot.socket, address);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
-    result = destroy_socket(server, &slot.socket) && result;
+    result = destroy_socket(&slot.socket) && result;
   }
 
   return result;
 }
 
 bool create_acceptor(ah_acceptor* result_acceptor,
-                     ah_server* server,
                      ah_socket* listening_socket,
-                     ah_on_accept on_accept,
-                     void* user_data)
+                     ah_on_accept on_accept)
 {
-  (void)server;
-
   listening_socket->pointer = result_acceptor;
-
-  *result_acceptor = (ah_acceptor) {on_accept, user_data};
+  *result_acceptor = (ah_acceptor) {on_accept};
   return true;
 }
 
@@ -378,7 +383,7 @@ bool server_tick(ah_server* server, int* error_code)
     ah_socket* socket = (ah_socket*)server->events[i].data.ptr;
     if (socket->role == AH_SOCKET_ACCEPT) {
       ah_acceptor* acceptor = (ah_acceptor*)socket->pointer;
-      if (!accept_handler(server, acceptor, socket)) {
+      if (!accept_handler((ah_on_accept)acceptor->on_accept, socket)) {
         return false;
       }
     }

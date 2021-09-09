@@ -10,6 +10,11 @@ typedef struct ah_server ah_server;
 typedef struct ah_socket ah_socket;
 typedef struct ah_acceptor ah_acceptor;
 
+typedef struct ah_context {
+  ah_server* server;
+  void* user_data;
+} ah_context;
+
 typedef struct ah_socket_span {
   size_t size;
   ah_socket* sockets;
@@ -25,10 +30,8 @@ typedef struct ah_socket_accepted {
 } ah_socket_accepted;
 
 typedef bool (*ah_on_accept)(ah_error_code error_code,
-                             ah_server* server,
                              ah_socket* socket,
-                             ah_ipv4_address address,
-                             void* user_data);
+                             ah_ipv4_address address);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -48,18 +51,20 @@ size_t socket_size(void);
 /**
  * @brief Creates a TCP/IPv4 socket bound to and listening on \c port.
  */
-bool create_socket(ah_socket* result_socket, ah_server* server, uint16_t port);
+bool create_socket(ah_socket* result_socket,
+                   ah_context* context,
+                   uint16_t port);
 
 /**
  * @brief Closes the provided socket.
  */
-bool destroy_socket(ah_server* server, ah_socket* socket);
+bool destroy_socket(ah_socket* socket);
 
 /**
  * @brief Closes the provided socket that was taken ownership of in an accept
  * handler.
  */
-bool destroy_socket_accepted(ah_server* server, ah_socket_accepted* socket);
+bool destroy_socket_accepted(ah_socket_accepted* socket);
 
 /**
  * @brief Sets the internal socket span to the one provided.
@@ -80,10 +85,8 @@ size_t acceptor_size(void);
  * @brief Creates an acceptor that queues an accept operation in the server.
  */
 bool create_acceptor(ah_acceptor* result_acceptor,
-                     ah_server* server,
                      ah_socket* listening_socket,
-                     ah_on_accept on_accept,
-                     void* user_data);
+                     ah_on_accept on_accept);
 
 /**
  * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.
@@ -100,3 +103,13 @@ bool server_tick(ah_server* server, int* error_code);
  * ::ah_on_accept callback.
  */
 void move_socket(ah_socket_accepted* result_socket, ah_socket* socket);
+
+/**
+ * @brief Returns the ::ah_context pointer from the socket.
+ */
+ah_context* context_from_socket(ah_socket* socket);
+
+/**
+ * @brief Returns the ::ah_context pointer from the accepted socket.
+ */
+ah_context* context_from_socket_accepted(ah_socket_accepted* socket);

@@ -20,13 +20,10 @@ typedef struct io_operation {
 } io_operation;
 
 static bool on_accept(ah_error_code error_code,
-                      ah_server* server,
                       ah_socket* socket,
-                      ah_ipv4_address address,
-                      void* user_data)
+                      ah_ipv4_address address)
 {
   (void)error_code;
-  (void)user_data;
 
   printf("New connection from %hhu.%hhu.%hhu.%hhu:%hu\n",
          address.address[0],
@@ -42,7 +39,7 @@ static bool on_accept(ah_error_code error_code,
 
   move_socket(&op->socket, socket);
 
-  bool result = destroy_socket_accepted(server, &op->socket);
+  bool result = destroy_socket_accepted(&op->socket);
   free(op);
 
   return result;
@@ -56,16 +53,17 @@ library create_library()
   }
 
   ah_socket* socket = ez_malloc(socket_size());
+  ah_context context = {server, NULL};
   {
     const uint16_t port = 1337;
-    if (!create_socket(socket, server, port)) {
+    if (!create_socket(socket, &context, port)) {
       goto exit;
     }
   }
   set_socket_span(server, (ah_socket_span) {1, socket});
 
   ah_acceptor* acceptor = ez_malloc(acceptor_size());
-  if (!create_acceptor(acceptor, server, socket, on_accept, NULL)) {
+  if (!create_acceptor(acceptor, socket, on_accept)) {
     goto exit;
   }
 

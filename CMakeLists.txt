@@ -35,11 +35,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         <MSWSock.h>
     )
   endif()
-  set(ah_socket_accepted_size 56)
+  set(ah_socket_accepted_size 64)
   set(ah_error_code_category nt)
 else()
   target_sources(adhoc-server_server PRIVATE source/server.posix.c)
-  set(ah_socket_accepted_size 16)
+  set(ah_socket_accepted_size 24)
   set(ah_error_code_category posix)
 endif()
 
