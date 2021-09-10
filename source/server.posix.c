@@ -365,15 +365,15 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
 
 /* Event loop */
 
-bool server_tick(ah_server* server, int* error_code)
+bool server_tick(ah_server* server, int* error_code_out)
 {
   int new_events =
       epoll_wait(server->epoll_descriptor, server->events, MAX_EVENTS, -1);
   if (new_events == -1) {
-    if (error_code == NULL) {
+    if (error_code_out == NULL) {
       perror("epoll_wait");
     } else {
-      *error_code = errno;
+      *error_code_out = errno;
     }
 
     return false;

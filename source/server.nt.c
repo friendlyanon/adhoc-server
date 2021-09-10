@@ -135,6 +135,11 @@ static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
   return (ah_overlapped_base*)base;
 }
 
+static void clear_overlapped(LPOVERLAPPED overlapped)
+{
+  *overlapped = (OVERLAPPED) {0};
+}
+
 typedef struct ah_socket {
   SOCKET socket;
   ah_overlapped_base base;
@@ -355,15 +360,8 @@ static ah_on_accept on_accept_from_acceptor(ah_acceptor* acceptor)
   return (ah_on_accept)acceptor->listening_socket.on_complete;
 }
 
-static bool accept_error_handler(ah_acceptor* acceptor,
-                                 const char* function,
-                                 int error_code)
+static bool accept_on_error(ah_acceptor* acceptor, int error_code)
 {
-  if (!is_ah_error_code(error_code)) {
-    print_error(function, error_code);
-    return false;
-  }
-
   ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
   ah_context* context = acceptor->listening_socket.context;
   ah_socket_slot slot = {false, {.context = context}};
@@ -371,11 +369,30 @@ static bool accept_error_handler(ah_acceptor* acceptor,
       (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
 }
 
+static bool accept_error_handler(ah_acceptor* acceptor,
+                                 const char* function,
+                                 int error_code)
+{
+  if (is_ah_error_code(error_code)) {
+    return accept_on_error(acceptor, error_code);
+  }
+
+  print_error(function, error_code);
+  return false;
+}
+
 static bool do_accept(LPOVERLAPPED overlapped);
 
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+  {
+    int error_code = (int)overlapped->Offset;
+    if (error_code != 0) {
+      return accept_on_error(acceptor, error_code);
+    }
+  }
+
   {
     int error_code;
     ah_socket_slot slot =
@@ -433,9 +450,18 @@ static bool queue_overlapped(HANDLE completion_port, LPOVERLAPPED overlapped)
   return true;
 }
 
+static int map_error_code(int error_code);
+
 static bool do_accept(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
+  {
+    int error_code = (int)overlapped->Offset;
+    if (error_code != 0) {
+      return accept_on_error(acceptor, error_code);
+    }
+  }
+
   ah_context* context = acceptor->listening_socket.context;
   {
     int error_code;
@@ -447,6 +473,7 @@ static bool do_accept(LPOVERLAPPED overlapped)
     acceptor->socket = slot.socket;
   }
 
+  clear_overlapped(overlapped);
   DWORD bytes_read;
   BOOL accept_result = AcceptEx(acceptor->listening_socket.socket,
                                 acceptor->socket.socket,
@@ -457,7 +484,7 @@ static bool do_accept(LPOVERLAPPED overlapped)
                                 &bytes_read,
                                 overlapped);
   if (accept_result == FALSE) {
-    int error_code = WSAGetLastError();
+    int error_code = map_error_code(WSAGetLastError());
     if (error_code != ERROR_IO_PENDING) {
       if (!is_ah_error_code(error_code)) {
         print_error("AcceptEx", error_code);
@@ -505,7 +532,19 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
 
 /* Event loop */
 
-bool server_tick(ah_server* server, int* error_code)
+static int map_error_code(int error_code)
+{
+  switch (error_code) {
+    case ERROR_NETNAME_DELETED:
+      return (int)AH_ERR_CONNECTION_RESET;
+    case ERROR_PORT_UNREACHABLE:
+      return (int)AH_ERR_CONNECTION_REFUSED;
+  }
+
+  return error_code;
+}
+
+bool server_tick(ah_server* server, int* error_code_out)
 {
   DWORD bytes_transferred;
   ULONG_PTR completion_key;
@@ -515,17 +554,24 @@ bool server_tick(ah_server* server, int* error_code)
                                           &completion_key,
                                           &overlapped,
                                           INFINITE);
-  if (result == FALSE) {
-    if (error_code == NULL) {
-      print_error("GetQueuedCompletionStatus", (int)GetLastError());
-    } else {
-      *error_code = (int)GetLastError();
-    }
-
-    return false;
-  }
-
   assert(overlapped != NULL);
   ah_overlapped_base* base = base_from_overlapped(overlapped);
+  overlapped->Offset = 0;
+
+  if (result == FALSE) {
+    int error_code = map_error_code((int)GetLastError());
+    if (!is_ah_error_code(error_code)) {
+      if (error_code_out == NULL) {
+        print_error("GetQueuedCompletionStatus", error_code);
+      } else {
+        *error_code_out = error_code;
+      }
+
+      return false;
+    }
+
+    overlapped->Offset = (DWORD)error_code;
+  }
+
   return base->handler(overlapped);
 }

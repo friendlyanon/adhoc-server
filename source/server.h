@@ -105,10 +105,10 @@ bool create_acceptor(ah_acceptor* result_acceptor,
  *
  * This function calls the platform dependent event loop function to dequeue
  * events and dispatches on those events. If this function fails, then the OS
- * native error code will be returned via the \c error_code parameter. If \c
- * error_code is \c NULL, then the error will be printed to stderr.
+ * native error code will be returned via the \c error_code_out parameter. If
+ * \c error_code_out is \c NULL, then the error will be printed to stderr.
  */
-bool server_tick(ah_server* server, int* error_code);
+bool server_tick(ah_server* server, int* error_code_out);
 
 /**
  * @brief Takes the ownership of an accepted socket from the server in an
