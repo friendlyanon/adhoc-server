@@ -495,7 +495,7 @@ static bool do_accept(LPOVERLAPPED overlapped)
       ah_socket_slot slot = {false, {.context = context}};
       bool result = on_accept(
           (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
-      destroy_socket(&acceptor->socket);
+      result = destroy_socket(&acceptor->socket) && result;
       if (!result) {
         return false;
       }
