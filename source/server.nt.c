@@ -383,6 +383,8 @@ static bool accept_error_handler(ah_acceptor* acceptor,
 
 static bool do_accept(LPOVERLAPPED overlapped);
 
+static bool io_handler(LPOVERLAPPED overlapped);
+
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
   ah_acceptor* acceptor = acceptor_from_overlapped(overlapped);
@@ -403,6 +405,7 @@ static bool accept_handler(LPOVERLAPPED overlapped)
       return accept_error_handler(
           acceptor, "CreateIoCompletionPort", error_code);
     }
+    slot.socket.base.handler = io_handler;
     acceptor->socket = slot.socket;
   }
 
@@ -427,7 +430,6 @@ static bool accept_handler(LPOVERLAPPED overlapped)
       ntohs(remote_address->sin_port),
   };
   ah_socket_slot slot = {true, acceptor->socket};
-  /* TODO: Implement I/O for the handler */
   ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
   bool result = on_accept(AH_ERR_OK, &slot.socket, address);
   /* If ownership of the socket wasn't taken by the handler, then it gets
@@ -530,6 +532,83 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
   }
 }
 
+static bool io_handler(LPOVERLAPPED overlapped)
+{
+  ah_socket* socket = socket_from_overlapped(overlapped);
+  uint32_t bytes_transferred = overlapped->OffsetHigh;
+  ah_error_code error_code = (ah_error_code)(int)overlapped->Offset;
+
+  ah_on_io_complete on_complete = (ah_on_io_complete)socket->on_complete;
+  return on_complete(
+      error_code, (ah_socket_accepted*)socket, bytes_transferred);
+}
+
+bool queue_read_operation(ah_socket_accepted* accepted_socket,
+                          void* output_buffer,
+                          uint32_t buffer_length,
+                          ah_on_io_complete on_complete)
+{
+  if (buffer_length > (uint32_t)INT32_MAX) {
+    return false;
+  }
+
+  ah_socket* socket = (ah_socket*)accepted_socket;
+  socket->on_complete = (void*)on_complete;
+
+  LPOVERLAPPED overlapped = &socket->base.overlapped;
+  clear_overlapped(overlapped);
+
+  WSABUF buffer = {buffer_length, output_buffer};
+  DWORD flags = 0;
+  int result =
+      WSARecv(socket->socket, &buffer, 1, NULL, &flags, overlapped, NULL);
+  if (result == SOCKET_ERROR) {
+    int error_code = map_error_code(WSAGetLastError());
+    if (error_code != WSA_IO_PENDING) {
+      if (is_ah_error_code(error_code)) {
+        return on_complete((ah_error_code)error_code, accepted_socket, 0);
+      }
+
+      print_error("WSARecv", error_code);
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool queue_write_operation(ah_socket_accepted* accepted_socket,
+                           void* input_buffer,
+                           uint32_t buffer_length,
+                           ah_on_io_complete on_complete)
+{
+  if (buffer_length > (uint32_t)INT32_MAX) {
+    return false;
+  }
+
+  ah_socket* socket = (ah_socket*)accepted_socket;
+  socket->on_complete = (void*)on_complete;
+
+  LPOVERLAPPED overlapped = &socket->base.overlapped;
+  clear_overlapped(overlapped);
+
+  WSABUF buffer = {buffer_length, input_buffer};
+  int result = WSASend(socket->socket, &buffer, 1, NULL, 0, overlapped, NULL);
+  if (result == SOCKET_ERROR) {
+    int error_code = map_error_code(WSAGetLastError());
+    if (error_code != WSA_IO_PENDING) {
+      if (is_ah_error_code(error_code)) {
+        return on_complete((ah_error_code)error_code, accepted_socket, 0);
+      }
+
+      print_error("WSASend", error_code);
+      return false;
+    }
+  }
+
+  return true;
+}
+
 /* Event loop */
 
 static int map_error_code(int error_code)
@@ -556,6 +635,7 @@ bool server_tick(ah_server* server, int* error_code_out)
                                           INFINITE);
   assert(overlapped != NULL);
   ah_overlapped_base* base = base_from_overlapped(overlapped);
+  overlapped->OffsetHigh = bytes_transferred;
   overlapped->Offset = 0;
 
   if (result == FALSE) {

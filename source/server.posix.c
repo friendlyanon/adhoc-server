@@ -66,13 +66,16 @@ typedef enum ah_socket_role
 {
   AH_SOCKET_ACCEPT = 0,
   AH_SOCKET_IO,
+  AH_SOCKET_IO_REARM,
 } ah_socket_role;
 
 typedef struct ah_socket {
   int socket;
   ah_socket_role role;
   ah_context* context;
+  void* on_complete;
   void* pointer;
+  uint32_t length;
 } ah_socket;
 
 _Static_assert(
@@ -208,7 +211,7 @@ static ah_socket_slot queue_socket(ah_socket_slot slot,
 
 bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
 {
-  ah_socket_slot slot = {true, {-1, AH_SOCKET_ACCEPT, context, NULL}};
+  ah_socket_slot slot = {true, {.socket = -1, AH_SOCKET_ACCEPT, context}};
   slot = create_unbound_socket(slot);
   slot = socket_set_nonblocking(slot, true);
   slot = socket_enable_address_reuse(slot);
@@ -265,7 +268,7 @@ bool destroy_socket_accepted(ah_socket_accepted* socket)
 /* Acceptor creation */
 
 typedef struct ah_acceptor {
-  ah_on_accept on_accept;
+  char dummy;
 } ah_acceptor;
 
 size_t acceptor_size()
@@ -288,8 +291,9 @@ static bool accept_error_handler(ah_context* context,
       (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
 }
 
-static bool accept_handler(ah_on_accept on_accept, ah_socket* socket)
+static bool accept_handler(ah_socket* socket)
 {
+  ah_on_accept on_accept = (ah_on_accept)socket->on_complete;
   ah_context* context = context_from_socket(socket);
   struct sockaddr_in remote_address = {0};
   socklen_t remote_address_length = sizeof(remote_address);
@@ -314,9 +318,9 @@ static bool accept_handler(ah_on_accept on_accept, ah_socket* socket)
   }
 #endif
 
-  ah_socket_slot slot = (ah_socket_slot) {
+  ah_socket_slot slot = {
       .ok = true,
-      {incoming_socket, AH_SOCKET_IO, context, NULL},
+      {.socket = incoming_socket, AH_SOCKET_IO, context},
   };
   slot = socket_set_nonblocking(slot, false);
   if (!slot.ok) {
@@ -331,7 +335,6 @@ static bool accept_handler(ah_on_accept on_accept, ah_socket* socket)
        address_raw & 0xFF},
       ntohs(remote_address.sin_port),
   };
-  /* TODO: Implement I/O for the handler */
   bool result = on_accept(AH_ERR_OK, &slot.socket, address);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
@@ -346,8 +349,8 @@ bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_socket* listening_socket,
                      ah_on_accept on_accept)
 {
-  listening_socket->pointer = result_acceptor;
-  *result_acceptor = (ah_acceptor) {on_accept};
+  listening_socket->on_complete = (void*)on_accept;
+  *result_acceptor = (ah_acceptor) {0};
   return true;
 }
 
@@ -361,6 +364,105 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
     memcpy(result_socket, socket, socket_size());
     slot->ok = false;
   }
+}
+
+static bool register_io_socket(ah_socket* socket, uint32_t events, bool rearm)
+{
+  events |= EPOLLERR | EPOLLHUP | EPOLLET | EPOLLONESHOT;
+
+  int epoll_descriptor = context_from_socket(socket)->server->epoll_descriptor;
+  struct epoll_event event = {events, .data.ptr = socket};
+  int operation = rearm ? EPOLL_CTL_MOD : EPOLL_CTL_ADD;
+  if (epoll_ctl(epoll_descriptor, operation, socket->socket, &event) == -1) {
+    perror("epoll_ctl");
+    return false;
+  }
+
+  return true;
+}
+
+static bool read_handler(ah_socket* socket)
+{
+  ah_on_io_complete on_complete = (ah_on_io_complete)socket->on_complete;
+  ssize_t bytes_transferred =
+      recv(socket->socket, socket->pointer, socket->length, 0);
+
+  int error_code = 0;
+  if (bytes_transferred == -1) {
+    error_code = errno;
+    if (!is_ah_error_code(error_code)) {
+      perror("recv");
+      return false;
+    }
+
+    bytes_transferred = 0;
+  }
+
+  return on_complete((ah_error_code)error_code,
+                     (ah_socket_accepted*)socket,
+                     (uint32_t)bytes_transferred);
+}
+
+bool queue_read_operation(ah_socket_accepted* accepted_socket,
+                          void* output_buffer,
+                          uint32_t buffer_length,
+                          ah_on_io_complete on_complete)
+{
+  if (buffer_length > (uint32_t)INT32_MAX) {
+    return false;
+  }
+
+  ah_socket* socket = (ah_socket*)accepted_socket;
+  socket->on_complete = (void*)on_complete;
+  socket->pointer = output_buffer;
+  socket->length = buffer_length;
+
+  bool result =
+      register_io_socket(socket, EPOLLIN, socket->role == AH_SOCKET_IO_REARM);
+  socket->role = AH_SOCKET_IO_REARM;
+  return result;
+}
+
+static bool write_handler(ah_socket* socket)
+{
+  ah_on_io_complete on_complete = (ah_on_io_complete)socket->on_complete;
+  ssize_t bytes_transferred =
+      send(socket->socket, socket->pointer, socket->length, 0);
+
+  int error_code = 0;
+  if (bytes_transferred == -1) {
+    error_code = errno;
+    if (!is_ah_error_code(error_code)) {
+      perror("send");
+      return false;
+    }
+
+    bytes_transferred = 0;
+  }
+
+  return on_complete((ah_error_code)error_code,
+                     (ah_socket_accepted*)socket,
+                     (uint32_t)bytes_transferred);
+}
+
+bool queue_write_operation(ah_socket_accepted* accepted_socket,
+                           void* input_buffer,
+                           uint32_t buffer_length,
+                           ah_on_io_complete on_complete)
+{
+  if (buffer_length > (uint32_t)INT32_MAX) {
+    return false;
+  }
+
+  ah_socket* socket = (ah_socket*)accepted_socket;
+  socket->on_complete = (void*)on_complete;
+  socket->pointer = input_buffer;
+  socket->length = buffer_length;
+
+  bool result =
+      register_io_socket(socket, EPOLLOUT, socket->role == AH_SOCKET_IO_REARM);
+  socket->role = AH_SOCKET_IO_REARM;
+  return result;
 }
 
 /* Event loop */
@@ -380,14 +482,19 @@ bool server_tick(ah_server* server, int* error_code_out)
   }
 
   for (int i = 0; i < new_events; ++i) {
-    ah_socket* socket = (ah_socket*)server->events[i].data.ptr;
+    struct epoll_event* event = &server->events[i];
+    ah_socket* socket = (ah_socket*)event->data.ptr;
     if (socket->role == AH_SOCKET_ACCEPT) {
-      ah_acceptor* acceptor = (ah_acceptor*)socket->pointer;
-      if (!accept_handler((ah_on_accept)acceptor->on_accept, socket)) {
+      if (!accept_handler(socket)) {
+        return false;
+      }
+    } else {
+      bool result = (event->events & EPOLLIN) != 0 ? read_handler(socket)
+                                                   : write_handler(socket);
+      if (!result) {
         return false;
       }
     }
-    /* TODO: handle I/O events */
   }
 
   return true;

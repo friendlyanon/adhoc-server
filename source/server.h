@@ -29,9 +29,27 @@ typedef struct ah_socket_accepted {
   uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
 } ah_socket_accepted;
 
+/**
+ * @brief Callback type for async accept operation.
+ *
+ * The \c socket parameter must be taken ownership of using the ::move_socket
+ * function to perform async I/O operations on it. Failing to take ownership of
+ * the socket will result in its closure after the callback returns.
+ */
 typedef bool (*ah_on_accept)(ah_error_code error_code,
                              ah_socket* socket,
                              ah_ipv4_address address);
+
+/**
+ * @brief Callback type for the async I/O operations.
+ *
+ * Although the \c bytes_transferred parameter is an unsigned integer, this
+ * value will not be greater than \c INT32_MAX (2147483647). However, it can be
+ * 0 sometimes, when there is a pending empty packet to be read.
+ */
+typedef bool (*ah_on_io_complete)(ah_error_code error_code,
+                                  ah_socket_accepted* socket,
+                                  uint32_t bytes_transferred);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -137,3 +155,29 @@ ah_context* context_from_socket_accepted(ah_socket_accepted* socket);
            ah_socket_accepted*: context_from_socket_accepted)(socket)
 
 /* clang-format on */
+
+/**
+ * @brief Queues a read operation into the provided buffer.
+ *
+ * The buffer must stay alive for the duration of the operation. The provided
+ * \c buffer_length MUST NOT be greater than \c INT32_MAX (2147483647). The
+ * callback will also not receive a value greater than that for the number of
+ * bytes transferred.
+ */
+bool queue_read_operation(ah_socket_accepted* accepted_socket,
+                          void* output_buffer,
+                          uint32_t buffer_length,
+                          ah_on_io_complete on_complete);
+
+/**
+ * @brief Queues a write operation from the provided buffer.
+ *
+ * The buffer must stay alive for the duration of the operation. The provided
+ * \c buffer_length MUST NOT be greater than \c INT32_MAX (2147483647). The
+ * callback will also not receive a value greater than that for the number of
+ * bytes transferred.
+ */
+bool queue_write_operation(ah_socket_accepted* accepted_socket,
+                           void* input_buffer,
+                           uint32_t buffer_length,
+                           ah_on_io_complete on_complete);

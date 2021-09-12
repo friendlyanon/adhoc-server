@@ -17,7 +17,49 @@ static void* ez_malloc(size_t size)
 
 typedef struct io_operation {
   ah_socket_accepted socket;
+  ah_ipv4_address address;
+  uint32_t length;
+  uint8_t buffer[KILOBYTES(8)];
 } io_operation;
+
+#define IO_OP_FROM_SOCKET(socket_) \
+  (io_operation*)((char*)(socket_)-offsetof(io_operation, socket))
+
+static bool on_write_complete(ah_error_code error_code,
+                              ah_socket_accepted* socket,
+                              uint32_t bytes_transferred)
+{
+  (void)error_code;
+  (void)bytes_transferred;
+
+  io_operation* op = IO_OP_FROM_SOCKET(socket);
+  bool result = destroy_socket(&op->socket);
+  ah_ipv4_address address = op->address;
+
+  printf("Connection closed (%hhu.%hhu.%hhu.%hhu:%hu)\n",
+         address.address[0],
+         address.address[1],
+         address.address[2],
+         address.address[3],
+         address.port);
+
+  free(op);
+  return result;
+}
+
+static bool on_read_complete(ah_error_code error_code,
+                             ah_socket_accepted* socket,
+                             uint32_t bytes_transferred)
+{
+  (void)error_code;
+
+  io_operation* op = IO_OP_FROM_SOCKET(socket);
+
+  fwrite(op->buffer, 1, bytes_transferred, stdout);
+
+  return queue_write_operation(
+      socket, op->buffer, bytes_transferred, on_write_complete);
+}
 
 static bool on_accept(ah_error_code error_code,
                       ah_socket* socket,
@@ -38,11 +80,10 @@ static bool on_accept(ah_error_code error_code,
   }
 
   move_socket(&op->socket, socket);
+  *op = (io_operation) {op->socket, address, .length = 0};
 
-  bool result = destroy_socket(&op->socket);
-  free(op);
-
-  return result;
+  return queue_read_operation(
+      &op->socket, op->buffer, KILOBYTES(8), on_read_complete);
 }
 
 library create_library()
