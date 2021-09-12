@@ -299,6 +299,28 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
   return slot.ok;
 }
 
+/* Server destruction */
+
+bool destroy_server(ah_server* server)
+{
+  if (server->completion_port == INVALID_HANDLE_VALUE) {
+    return true;
+  }
+
+  bool result = CloseHandle(server->completion_port) != 0;
+  if (!result) {
+    print_error("CloseHandle", (int)GetLastError());
+  }
+
+  ah_socket_span span = server->socket_span;
+  for (size_t i = 0, size = span.size; i != size; ++i) {
+    result = destroy_socket(&span.sockets[i]) && result;
+  }
+
+  server->completion_port = INVALID_HANDLE_VALUE;
+  return result;
+}
+
 /* Context retrieval */
 
 ah_context* context_from_socket_base(ah_socket* socket)
@@ -518,6 +540,13 @@ bool create_acceptor(ah_acceptor* result_acceptor,
   *result_acceptor = (ah_acceptor) {.listening_socket = *listening_socket};
   result_acceptor->listening_socket.on_complete = (void*)on_accept;
   return do_accept(&result_acceptor->listening_socket.base.overlapped);
+}
+
+/* Acceptor destruction */
+
+bool destroy_acceptor(ah_acceptor* acceptor)
+{
+  return destroy_socket(&acceptor->listening_socket);
 }
 
 /* I/O */

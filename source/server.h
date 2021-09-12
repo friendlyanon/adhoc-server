@@ -62,6 +62,11 @@ size_t server_size(void);
 bool create_server(ah_server* result_server);
 
 /**
+ * @brief Destroys the provided server.
+ */
+bool destroy_server(ah_server* server);
+
+/**
  * @brief Returns the size of the buffer to be allocated for ::create_socket.
  */
 size_t socket_size(void);
@@ -117,6 +122,11 @@ size_t acceptor_size(void);
 bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_socket* listening_socket,
                      ah_on_accept on_accept);
+
+/**
+ * @brief Destroys the provided acceptor.
+ */
+bool destroy_acceptor(ah_acceptor* acceptor);
 
 /**
  * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.

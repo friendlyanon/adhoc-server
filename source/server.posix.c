@@ -223,6 +223,28 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
   return slot.ok;
 }
 
+/* Acceptor destruction */
+
+bool destroy_server(ah_server* server)
+{
+  if (server->epoll_descriptor == -1) {
+    return true;
+  }
+
+  bool result = close(server->epoll_descriptor) == 0;
+  if (!result) {
+    perror("close");
+  }
+
+  ah_socket_span span = server->socket_span;
+  for (size_t i = 0, size = span.size; i != size; ++i) {
+    result = destroy_socket(&span.sockets[i]) && result;
+  }
+
+  server->epoll_descriptor = -1;
+  return true;
+}
+
 /* Context retrieval */
 
 ah_context* context_from_socket_base(ah_socket* socket)
@@ -351,6 +373,15 @@ bool create_acceptor(ah_acceptor* result_acceptor,
 {
   listening_socket->on_complete = (void*)on_accept;
   *result_acceptor = (ah_acceptor) {0};
+  return true;
+}
+
+/* Acceptor destruction */
+
+bool destroy_acceptor(ah_acceptor* acceptor)
+{
+  (void)acceptor;
+
   return true;
 }
 
