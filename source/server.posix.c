@@ -46,7 +46,8 @@ bool create_server(ah_server* result_server)
   }
 
 #ifndef EPOLL_CLOEXEC
-  if (fcntl(descriptor, F_SETFD, FD_CLOEXEC) < 0) {
+  int flags = fcntl(descriptor, F_GETFD);
+  if (flags < 0 || fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC) < 0) {
     perror("fcntl");
     return false;
   }
