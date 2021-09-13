@@ -18,7 +18,6 @@ static void* ez_malloc(size_t size)
 typedef struct io_operation {
   ah_socket_accepted socket;
   ah_ipv4_address address;
-  uint32_t length;
   uint8_t buffer[KILOBYTES(8)];
 } io_operation;
 
@@ -80,7 +79,7 @@ static bool on_accept(ah_error_code error_code,
   }
 
   move_socket(&op->socket, socket);
-  *op = (io_operation) {op->socket, address, .length = 0};
+  op->address = address;
 
   return queue_read_operation(
       &op->socket, op->buffer, KILOBYTES(8), on_read_complete);
