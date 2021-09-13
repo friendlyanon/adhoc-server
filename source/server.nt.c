@@ -317,6 +317,8 @@ bool destroy_server(ah_server* server)
     result = destroy_socket(&span.sockets[i]) && result;
   }
 
+  result = WSACleanup() == 0 && result;
+
   server->completion_port = INVALID_HANDLE_VALUE;
   return result;
 }
