@@ -124,11 +124,6 @@ bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_on_accept on_accept);
 
 /**
- * @brief Destroys the provided acceptor.
- */
-bool destroy_acceptor(ah_acceptor* acceptor);
-
-/**
  * @brief Drives the <tt>server</tt>'s event loop and calls the event handlers.
  *
  * This function calls the platform dependent event loop function to dequeue

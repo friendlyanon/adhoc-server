@@ -31,6 +31,9 @@ static bool on_write_complete(ah_error_code error_code,
   (void)error_code;
   (void)bytes_transferred;
 
+  bool* stop_server = context_from_socket(socket)->user_data;
+  *stop_server = true;
+
   io_operation* op = IO_OP_FROM_SOCKET(socket);
   bool result = destroy_socket(&op->socket);
   ah_ipv4_address address = op->address;
@@ -89,16 +92,17 @@ library create_library()
 {
   ah_server* server = ez_malloc(server_size());
   if (!create_server(server)) {
-    goto cleanup_server;
+    goto exit;
   }
 
+  bool stop_server = false;
   ah_socket* socket = ez_malloc(socket_size());
   set_socket_span(server, (ah_socket_span) {1, socket});
-  ah_context context = {server, NULL};
+  ah_context context = {server, &stop_server};
   {
     const uint16_t port = 1337;
     if (!create_socket(socket, &context, port)) {
-      goto cleanup_server;
+      goto exit;
     }
   }
 
@@ -108,14 +112,12 @@ library create_library()
   }
 
   while (1) {
-    if (!server_tick(server, NULL)) {
+    if (!server_tick(server, NULL) || stop_server) {
       goto exit;
     }
   }
 
 exit:
-  destroy_acceptor(acceptor);
-cleanup_server:
   destroy_server(server);
   ez_buffer_pointer = ez_buffer;
   return (library) {"adhoc-server"};

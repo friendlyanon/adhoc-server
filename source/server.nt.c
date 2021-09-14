@@ -544,13 +544,6 @@ bool create_acceptor(ah_acceptor* result_acceptor,
   return do_accept(&result_acceptor->listening_socket.base.overlapped);
 }
 
-/* Acceptor destruction */
-
-bool destroy_acceptor(ah_acceptor* acceptor)
-{
-  return destroy_socket(&acceptor->listening_socket);
-}
-
 /* I/O */
 
 void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)

@@ -377,15 +377,6 @@ bool create_acceptor(ah_acceptor* result_acceptor,
   return true;
 }
 
-/* Acceptor destruction */
-
-bool destroy_acceptor(ah_acceptor* acceptor)
-{
-  (void)acceptor;
-
-  return true;
-}
-
 /* I/O */
 
 void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
