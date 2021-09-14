@@ -224,7 +224,7 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
   return slot.ok;
 }
 
-/* Acceptor destruction */
+/* Server destruction */
 
 bool destroy_server(ah_server* server)
 {
