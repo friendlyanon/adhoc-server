@@ -317,7 +317,14 @@ bool destroy_server(ah_server* server)
     result = destroy_socket(&span.sockets[i]) && result;
   }
 
-  result = WSACleanup() == 0 && result;
+  if (server->server_started) {
+    if (WSACleanup() == SOCKET_ERROR) {
+      print_error("WSACleanup", WSAGetLastError());
+      result = false;
+    }
+
+    server->server_started = false;
+  }
 
   server->completion_port = INVALID_HANDLE_VALUE;
   return result;
