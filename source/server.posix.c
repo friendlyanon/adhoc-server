@@ -228,18 +228,16 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
 
 bool destroy_server(ah_server* server)
 {
-  if (server->epoll_descriptor == -1) {
-    return true;
-  }
-
-  bool result = close(server->epoll_descriptor) == 0;
-  if (!result) {
-    perror("close");
-  }
+  bool result = true;
 
   ah_socket_span span = server->socket_span;
   for (size_t i = 0, size = span.size; i != size; ++i) {
     result = destroy_socket(&span.sockets[i]) && result;
+  }
+
+  if (server->epoll_descriptor != -1 && close(server->epoll_descriptor) == -1) {
+    perror("close");
+    result = false;
   }
 
   server->epoll_descriptor = -1;

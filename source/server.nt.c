@@ -303,29 +303,26 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
 
 bool destroy_server(ah_server* server)
 {
-  if (server->completion_port == INVALID_HANDLE_VALUE) {
-    return true;
-  }
-
-  bool result = CloseHandle(server->completion_port) != 0;
-  if (!result) {
-    print_error("CloseHandle", (int)GetLastError());
-  }
+  bool result = true;
 
   ah_socket_span span = server->socket_span;
   for (size_t i = 0, size = span.size; i != size; ++i) {
     result = destroy_socket(&span.sockets[i]) && result;
   }
 
-  if (server->server_started) {
-    if (WSACleanup() == SOCKET_ERROR) {
-      print_error("WSACleanup", WSAGetLastError());
-      result = false;
-    }
-
-    server->server_started = false;
+  if (server->completion_port != INVALID_HANDLE_VALUE
+      && CloseHandle(server->completion_port) == 0)
+  {
+    print_error("CloseHandle", (int)GetLastError());
+    result = false;
   }
 
+  if (server->server_started && WSACleanup() == SOCKET_ERROR) {
+    print_error("WSACleanup", WSAGetLastError());
+    result = false;
+  }
+
+  server->server_started = false;
   server->completion_port = INVALID_HANDLE_VALUE;
   return result;
 }
