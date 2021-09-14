@@ -10,9 +10,10 @@
 
 static void wide_trim_end(const wchar_t* begin, wchar_t* end)
 {
+  assert(begin != end);
+
   while (1) {
-    --end;
-    if (end < begin || iswspace(*end) == 0) {
+    if (--end == begin || iswspace(*end) == 0) {
       end[1] = L'\0';
       break;
     }

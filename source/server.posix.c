@@ -35,7 +35,7 @@ bool create_server(ah_server* result_server)
 #endif
 
   *result_server = (ah_server) {.epoll_descriptor = descriptor};
-  if (descriptor < 0) {
+  if (descriptor == -1) {
 #ifdef EPOLL_CLOEXEC
     perror("epoll_create1");
 #else
@@ -47,7 +47,7 @@ bool create_server(ah_server* result_server)
 
 #ifndef EPOLL_CLOEXEC
   int flags = fcntl(descriptor, F_GETFD);
-  if (flags < 0 || fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC) < 0) {
+  if (flags == -1 || fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC) == -1) {
     perror("fcntl");
     return false;
   }
@@ -106,7 +106,7 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
   }
 
   int unbound_socket = socket(AF_INET, SOCK_STREAM, 0);
-  if (unbound_socket < 0) {
+  if (unbound_socket == -1) {
     perror("socket");
     slot.ok = false;
   } else {
@@ -122,9 +122,9 @@ static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot, bool report)
     return slot;
   }
 
-  int socket_descriptor = slot.socket.socket;
-  int flags = fcntl(socket_descriptor, F_GETFL);
-  if (flags < 0 || fcntl(socket_descriptor, F_SETFL, flags | O_NONBLOCK) < 0) {
+  int descriptor = slot.socket.socket;
+  int flags = fcntl(descriptor, F_GETFL);
+  if (flags == -1 || fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == -1) {
     if (report) {
       perror("fcntl");
     }
@@ -144,7 +144,7 @@ static ah_socket_slot socket_enable_address_reuse(ah_socket_slot slot)
   int enable = true;
   int result = setsockopt(
       slot.socket.socket, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
-  if (result < 0) {
+  if (result == -1) {
     perror("setsockopt");
     slot.ok = false;
   }
@@ -164,7 +164,7 @@ static ah_socket_slot bind_socket(ah_socket_slot slot, uint16_t port)
       .sin_addr = {.s_addr = htonl(INADDR_ANY)},
   };
   const struct sockaddr* address_ptr = (const struct sockaddr*)&address;
-  if (bind(slot.socket.socket, address_ptr, sizeof(address)) < 0) {
+  if (bind(slot.socket.socket, address_ptr, sizeof(address)) == -1) {
     perror("bind");
     slot.ok = false;
   }
@@ -178,7 +178,7 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
     return slot;
   }
 
-  if (listen(slot.socket.socket, SOMAXCONN) < 0) {
+  if (listen(slot.socket.socket, SOMAXCONN) == -1) {
     perror("listen");
     slot.ok = false;
   }
@@ -502,7 +502,7 @@ bool server_tick(ah_server* server, int* error_code_out)
     return false;
   }
 
-  for (int i = 0; i < new_events; ++i) {
+  for (int i = 0; i != new_events; ++i) {
     struct epoll_event* event = &server->events[i];
     ah_socket* socket = (ah_socket*)event->data.ptr;
     if (socket->role == AH_SOCKET_ACCEPT) {
