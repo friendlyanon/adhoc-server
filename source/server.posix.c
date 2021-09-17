@@ -116,7 +116,20 @@ static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
   return slot;
 }
 
-static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot, bool report)
+typedef enum ah_blocking_type
+{
+  AH_BLOCKING,
+  AH_NONBLOCKING,
+} ah_blocking_type;
+
+static int fcntl_blocking_mask(int flags, ah_blocking_type type)
+{
+  return type == AH_BLOCKING ? flags & ~O_NONBLOCK : flags | O_NONBLOCK;
+}
+
+static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot,
+                                             ah_blocking_type type,
+                                             bool report)
 {
   if (!slot.ok) {
     return slot;
@@ -124,7 +137,9 @@ static ah_socket_slot socket_set_nonblocking(ah_socket_slot slot, bool report)
 
   int descriptor = slot.socket.socket;
   int flags = fcntl(descriptor, F_GETFL);
-  if (flags == -1 || fcntl(descriptor, F_SETFL, flags | O_NONBLOCK) == -1) {
+  bool result = flags != -1
+      && fcntl(descriptor, F_SETFL, fcntl_blocking_mask(flags, type)) != -1;
+  if (!result) {
     if (report) {
       perror("fcntl");
     }
@@ -214,7 +229,7 @@ bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
 {
   ah_socket_slot slot = {true, {.socket = -1, AH_SOCKET_ACCEPT, context}};
   slot = create_unbound_socket(slot);
-  slot = socket_set_nonblocking(slot, true);
+  slot = socket_set_nonblocking(slot, AH_NONBLOCKING, true);
   slot = socket_enable_address_reuse(slot);
   slot = bind_socket(slot, port);
   slot = listen_on_socket(slot);
@@ -273,8 +288,27 @@ bool destroy_socket_base(ah_socket* socket)
   }
 
   if (close(socket->socket) != 0) {
-    perror("close");
-    return false;
+    int error_code = errno;
+    bool can_try_nonblocking = is_ah_error_code(error_code)
+        /* This can potentially be redundant, but the man pages say that one
+         * should check for both if at least one is checked */
+        /* NOLINTNEXTLINE(misc-redundant-expression) */
+        && (error_code == AH_ERR_TRY_AGAIN || error_code == AH_ERR_WOULD_BLOCK);
+    if (!can_try_nonblocking) {
+      perror("close");
+      return false;
+    }
+
+    ah_socket_slot slot = socket_set_nonblocking(
+        (ah_socket_slot) {true, *socket}, AH_BLOCKING, true);
+    if (!slot.ok) {
+      return false;
+    }
+
+    if (close(socket->socket) != 0) {
+      perror("close");
+      return false;
+    }
   }
 
   socket->socket = -1;
@@ -343,7 +377,7 @@ static bool accept_handler(ah_socket* socket)
       .ok = true,
       {.socket = incoming_socket, AH_SOCKET_IO, context},
   };
-  slot = socket_set_nonblocking(slot, false);
+  slot = socket_set_nonblocking(slot, AH_NONBLOCKING, false);
   if (!slot.ok) {
     return accept_error_handler(context, on_accept, "fcntl");
   }
