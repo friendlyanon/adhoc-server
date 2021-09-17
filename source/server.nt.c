@@ -38,7 +38,11 @@ static void print_error(const char* function, int error_code)
     fwprintf(stderr, L"%S: 0x%08X\n", function, (unsigned int)error_code);
   } else {
     wide_trim_end(error_message, &error_message[result]);
-    fwprintf(stderr, L"%S: %s\n", function, error_message);
+    fwprintf(stderr,
+             L"%S (0x%08X): %s\n",
+             function,
+             (unsigned int)error_code,
+             error_message);
   }
 }
 
