@@ -256,7 +256,7 @@ bool destroy_server(ah_server* server)
   }
 
   server->epoll_descriptor = -1;
-  return true;
+  return result;
 }
 
 /* Context retrieval */
