@@ -1,10 +1,10 @@
-#include "server.nt.h"
-
-#include <MSWSock.h>
+#include <WinSock2.h>
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 #include <wctype.h>
+
+#include "server/detail.nt.h"
 
 #define ERROR_MESSAGE_SIZE 256
 

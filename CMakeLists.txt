@@ -18,10 +18,10 @@ include(cmake/variables.cmake)
 
 # ---- Declare libraries ----
 
-add_library(adhoc-server_server OBJECT source/error_code.c)
+add_library(adhoc-server_server OBJECT source/server/error_code.c)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
-  target_sources(adhoc-server_server PRIVATE source/server.nt.c)
+  target_sources(adhoc-server_server PRIVATE source/server/nt.c)
   target_link_libraries(adhoc-server_server PRIVATE Mswsock Ws2_32)
   target_compile_definitions(
       adhoc-server_server PRIVATE
@@ -38,7 +38,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
   set(ah_socket_accepted_size 64)
   set(ah_error_code_category nt)
 else()
-  target_sources(adhoc-server_server PRIVATE source/server.posix.c)
+  target_sources(adhoc-server_server PRIVATE source/server/posix.c)
   set(ah_socket_accepted_size 40)
   set(ah_error_code_category posix)
 endif()

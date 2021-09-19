@@ -1,5 +1,3 @@
-#include "server.h"
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -10,6 +8,8 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#include "server/detail.h"
 
 /* Server creation */
 

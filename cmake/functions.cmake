@@ -40,6 +40,8 @@ function(generate_error_codes source)
   list(JOIN output ",\n  AH_ERR_" enums)
   string(REPLACE ";" " = " enums "${enums}")
   configure_file(
-      cmake/error_code/error_code.h.in generated/error_code/error_code.h @ONLY
+      cmake/error_code/error_code.h.in
+      generated/error_code/server/error_code.h
+      @ONLY
   )
 endfunction()

@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "error_code.h"
+#include "server/error_code.h"
 
 typedef struct ah_server ah_server;
 typedef struct ah_socket ah_socket;
