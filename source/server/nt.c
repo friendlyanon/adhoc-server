@@ -136,8 +136,7 @@ typedef struct ah_overlapped_base {
 
 static ah_overlapped_base* base_from_overlapped(LPOVERLAPPED overlapped)
 {
-  char* base = (char*)overlapped - offsetof(ah_overlapped_base, overlapped);
-  return (ah_overlapped_base*)base;
+  return parentof(overlapped, ah_overlapped_base, overlapped);
 }
 
 static void clear_overlapped(LPOVERLAPPED overlapped)
@@ -154,9 +153,7 @@ typedef struct ah_socket {
 
 static ah_socket* socket_from_overlapped(LPOVERLAPPED overlapped)
 {
-  char* acceptor =
-      (char*)base_from_overlapped(overlapped) - offsetof(ah_socket, base);
-  return (ah_socket*)acceptor;
+  return parentof(base_from_overlapped(overlapped), ah_socket, base);
 }
 
 _Static_assert(
@@ -378,9 +375,8 @@ typedef struct ah_acceptor {
 
 static ah_acceptor* acceptor_from_overlapped(LPOVERLAPPED overlapped)
 {
-  char* acceptor = (char*)socket_from_overlapped(overlapped)
-      - offsetof(ah_acceptor, listening_socket);
-  return (ah_acceptor*)acceptor;
+  return parentof(
+      socket_from_overlapped(overlapped), ah_acceptor, listening_socket);
 }
 
 size_t acceptor_size()
@@ -557,8 +553,7 @@ bool create_acceptor(ah_acceptor* result_acceptor,
 
 void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
 {
-  ah_socket_slot* slot =
-      (ah_socket_slot*)((char*)socket - offsetof(ah_socket_slot, socket));
+  ah_socket_slot* slot = parentof(socket, ah_socket_slot, socket);
   if (slot->ok) {
     memcpy(result_socket, socket, socket_size());
     slot->ok = false;
