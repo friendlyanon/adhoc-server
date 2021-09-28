@@ -556,7 +556,7 @@ bool queue_write_operation(ah_io_dock* dock,
 
   uint32_t events = EPOLLOUT;
   if (((ah_io_port*)&dock->read_port)->active) {
-    events |= EPOLLOUT;
+    events |= EPOLLIN;
   }
 
   return register_io_socket(dock, events);
