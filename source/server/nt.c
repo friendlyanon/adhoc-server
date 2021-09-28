@@ -607,12 +607,8 @@ bool queue_read_operation(ah_io_dock* dock,
                           ah_io_buffer buffer,
                           ah_on_io_complete on_complete)
 {
-  if (buffer.buffer_length > (uint32_t)INT32_MAX) {
-    return false;
-  }
-
   ah_io_port* port = (ah_io_port*)&dock->read_port;
-  if (port->active) {
+  if (buffer.buffer_length > (uint32_t)INT32_MAX || port->active) {
     return false;
   }
 
@@ -645,12 +641,8 @@ bool queue_write_operation(ah_io_dock* dock,
                            ah_io_buffer buffer,
                            ah_on_io_complete on_complete)
 {
-  if (buffer.buffer_length > (uint32_t)INT32_MAX) {
-    return false;
-  }
-
   ah_io_port* port = (ah_io_port*)&dock->write_port;
-  if (port->active) {
+  if (buffer.buffer_length > (uint32_t)INT32_MAX || port->active) {
     return false;
   }
 
