@@ -26,6 +26,20 @@ size_t server_size()
   return sizeof(ah_server);
 }
 
+static bool set_close_on_exec(int descriptor, bool report)
+{
+  int flags = fcntl(descriptor, F_GETFD);
+  if (flags == -1 || fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC) == -1) {
+    if (report) {
+      perror("fcntl");
+    }
+
+    return false;
+  }
+
+  return true;
+}
+
 bool create_server(ah_server* result_server)
 {
 #ifdef EPOLL_CLOEXEC
@@ -46,9 +60,7 @@ bool create_server(ah_server* result_server)
   }
 
 #ifndef EPOLL_CLOEXEC
-  int flags = fcntl(descriptor, F_GETFD);
-  if (flags == -1 || fcntl(descriptor, F_SETFD, flags | FD_CLOEXEC) == -1) {
-    perror("fcntl");
+  if (!set_close_on_exec(descriptor, true)) {
     return false;
   }
 #endif
@@ -348,7 +360,7 @@ static bool accept_handler(ah_acceptor* acceptor)
 #endif
 
   ah_socket_slot slot = {
-      .ok = true,
+      .ok = set_close_on_exec(incoming_socket, false),
       {incoming_socket, AH_SOCKET_IO, context},
   };
   slot = socket_set_nonblocking(slot, AH_NONBLOCKING, false);
