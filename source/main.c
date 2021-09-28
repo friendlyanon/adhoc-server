@@ -2,8 +2,9 @@
 #  include <fcntl.h>
 #  include <io.h>
 #endif
-#include <lib.h>
 #include <stdio.h>
+
+#include "lib.h"
 
 int main(int argc, const char* argv[])
 {

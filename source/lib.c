@@ -1,8 +1,10 @@
-#include <lib.h>
-#include <server.h>
+#include "lib.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "server.h"
 
 #define KILOBYTES(n) (1024 * (n))
 
