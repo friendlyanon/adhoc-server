@@ -487,7 +487,10 @@ static bool do_accept(LPOVERLAPPED overlapped)
     ah_socket_slot slot = create_unbound_socket(
         (ah_socket_slot) {true, make_socket(context)}, &error_code);
     if (!slot.ok) {
-      return accept_error_handler(acceptor, "WSASocket", error_code);
+      bool result = destroy_socket(&slot.socket);
+      result =
+          accept_error_handler(acceptor, "WSASocket", error_code) && result;
+      return result;
     }
     acceptor->socket = slot.socket;
   }
@@ -507,6 +510,7 @@ static bool do_accept(LPOVERLAPPED overlapped)
     if (error_code != ERROR_IO_PENDING) {
       if (!is_ah_error_code(error_code)) {
         print_error("AcceptEx", error_code);
+        destroy_socket(&acceptor->socket);
         return false;
       }
 
