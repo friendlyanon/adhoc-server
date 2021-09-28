@@ -29,6 +29,21 @@ typedef struct ah_socket_accepted {
   uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
 } ah_socket_accepted;
 
+typedef struct ah_io_operation {
+  uint8_t reserved[AH_IO_OPERATION_SIZE];
+} ah_io_operation;
+
+typedef struct ah_io_dock {
+  ah_socket_accepted* socket;
+  ah_io_operation read_port;
+  ah_io_operation write_port;
+} ah_io_dock;
+
+typedef struct ah_io_buffer {
+  uint32_t buffer_length;
+  void* buffer;
+} ah_io_buffer;
+
 /**
  * @brief Callback type for async accept operation.
  *
@@ -48,7 +63,7 @@ typedef bool (*ah_on_accept)(ah_error_code error_code,
  * 0 sometimes, when there is a pending empty packet to be read.
  */
 typedef bool (*ah_on_io_complete)(ah_error_code error_code,
-                                  ah_socket_accepted* socket,
+                                  ah_io_operation* operation,
                                   uint32_t bytes_transferred);
 
 /**
@@ -162,6 +177,25 @@ ah_context* context_from_socket_accepted(ah_socket_accepted* socket);
 /* clang-format on */
 
 /**
+ * @brief Returns whether the I/O operation is parked in a dock, i.e. active.
+ *
+ * User code must call this function before queueing any I/O operation. A
+ * recommended way to deal with multiple operations of the same kind is to have
+ * a FIFO queue in user code for storing the excess.
+ */
+bool is_io_operation_active(ah_io_operation* operation);
+
+/**
+ * @brief Returns the queued buffer.
+ */
+ah_io_buffer buffer_from_io_operation(ah_io_operation* operation);
+
+/**
+ * @brief Returns the dock corresponding to the I/O operation.
+ */
+ah_io_dock* dock_from_operation(ah_io_operation* operation);
+
+/**
  * @brief Queues a read operation into the provided buffer.
  *
  * The buffer must stay alive for the duration of the operation. The provided
@@ -169,9 +203,8 @@ ah_context* context_from_socket_accepted(ah_socket_accepted* socket);
  * callback will also not receive a value greater than that for the number of
  * bytes transferred.
  */
-bool queue_read_operation(ah_socket_accepted* accepted_socket,
-                          void* output_buffer,
-                          uint32_t buffer_length,
+bool queue_read_operation(ah_io_dock* dock,
+                          ah_io_buffer buffer,
                           ah_on_io_complete on_complete);
 
 /**
@@ -182,7 +215,6 @@ bool queue_read_operation(ah_socket_accepted* accepted_socket,
  * callback will also not receive a value greater than that for the number of
  * bytes transferred.
  */
-bool queue_write_operation(ah_socket_accepted* accepted_socket,
-                           void* input_buffer,
-                           uint32_t buffer_length,
+bool queue_write_operation(ah_io_dock* dock,
+                           ah_io_buffer buffer,
                            ah_on_io_complete on_complete);

@@ -35,11 +35,13 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
         <MSWSock.h>
     )
   endif()
-  set(ah_socket_accepted_size 64)
+  set(ah_socket_accepted_size 16)
+  set(ah_io_operation_size 64)
   set(ah_error_code_category nt)
 else()
   target_sources(adhoc-server_server PRIVATE source/server/posix.c)
-  set(ah_socket_accepted_size 40)
+  set(ah_socket_accepted_size 16)
+  set(ah_io_operation_size 24)
   set(ah_error_code_category posix)
 endif()
 
@@ -47,9 +49,14 @@ set(
     adhoc-server_AH_SOCKET_ACCEPTED_SIZE "${ah_socket_accepted_size}"
     CACHE STRING "The size of the ah_socket_accepted struct"
 )
+set(
+    adhoc-server_AH_IO_OPERATION_SIZE "${ah_io_operation_size}"
+    CACHE STRING "The size of the ah_io_operation struct"
+)
 target_compile_definitions(
     adhoc-server_server PUBLIC
     "AH_SOCKET_ACCEPTED_SIZE=${adhoc-server_AH_SOCKET_ACCEPTED_SIZE}"
+    "AH_IO_OPERATION_SIZE=${adhoc-server_AH_IO_OPERATION_SIZE}"
 )
 
 set(

@@ -2,6 +2,7 @@
 #include <server.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define KILOBYTES(n) (1024 * (n))
 
@@ -15,28 +16,28 @@ static void* ez_malloc(size_t size)
   return pointer;
 }
 
-typedef struct io_operation {
+typedef struct io_session {
+  ah_io_dock dock;
   ah_socket_accepted socket;
   ah_ipv4_address address;
   uint8_t buffer[KILOBYTES(8)];
-} io_operation;
-
-#define IO_OP_FROM_SOCKET(socket_) \
-  (io_operation*)((char*)(socket_)-offsetof(io_operation, socket))
+} io_session;
 
 static bool on_write_complete(ah_error_code error_code,
-                              ah_socket_accepted* socket,
+                              ah_io_operation* operation,
                               uint32_t bytes_transferred)
 {
   (void)error_code;
   (void)bytes_transferred;
 
+  io_session* session = (io_session*)dock_from_operation(operation);
+  ah_socket_accepted* socket = &session->socket;
+
   bool* stop_server = context_from_socket(socket)->user_data;
   *stop_server = true;
 
-  io_operation* op = IO_OP_FROM_SOCKET(socket);
-  bool result = destroy_socket(&op->socket);
-  ah_ipv4_address address = op->address;
+  bool result = destroy_socket(socket);
+  ah_ipv4_address address = session->address;
 
   printf("Connection closed (%hhu.%hhu.%hhu.%hhu:%hu)\n",
          address.address[0],
@@ -45,22 +46,23 @@ static bool on_write_complete(ah_error_code error_code,
          address.address[3],
          address.port);
 
-  free(op);
+  free(session);
   return result;
 }
 
 static bool on_read_complete(ah_error_code error_code,
-                             ah_socket_accepted* socket,
+                             ah_io_operation* operation,
                              uint32_t bytes_transferred)
 {
   (void)error_code;
 
-  io_operation* op = IO_OP_FROM_SOCKET(socket);
+  ah_io_buffer buffer = buffer_from_io_operation(operation);
 
-  fwrite(op->buffer, 1, bytes_transferred, stdout);
+  fwrite(buffer.buffer, 1, bytes_transferred, stdout);
 
+  buffer.buffer_length = bytes_transferred;
   return queue_write_operation(
-      socket, op->buffer, bytes_transferred, on_write_complete);
+      dock_from_operation(operation), buffer, on_write_complete);
 }
 
 static bool on_accept(ah_error_code error_code,
@@ -76,16 +78,19 @@ static bool on_accept(ah_error_code error_code,
          address.address[3],
          address.port);
 
-  io_operation* op = malloc(sizeof(io_operation));
-  if (op == NULL) {
+  io_session* session = calloc(1, sizeof(io_session));
+  if (session == NULL) {
     return false;
   }
 
-  move_socket(&op->socket, socket);
-  op->address = address;
+  move_socket(&session->socket, socket);
+  session->dock.socket = &session->socket;
+  session->address = address;
 
   return queue_read_operation(
-      &op->socket, op->buffer, KILOBYTES(8), on_read_complete);
+      &session->dock,
+      (ah_io_buffer) {sizeof(session->buffer), session->buffer},
+      on_read_complete);
 }
 
 library create_library()
@@ -113,7 +118,7 @@ library create_library()
 
   while (1) {
     if (!server_tick(server, NULL) || stop_server) {
-      goto exit;
+      break;
     }
   }
 

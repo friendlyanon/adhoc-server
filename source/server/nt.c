@@ -146,19 +146,11 @@ static void clear_overlapped(LPOVERLAPPED overlapped)
 
 typedef struct ah_socket {
   SOCKET socket;
-  ah_overlapped_base base;
   ah_context* context;
-  void* on_complete;
 } ah_socket;
 
-static ah_socket* socket_from_overlapped(LPOVERLAPPED overlapped)
-{
-  return parentof(base_from_overlapped(overlapped), ah_socket, base);
-}
-
-_Static_assert(
-    sizeof(ah_socket) == sizeof(ah_socket_accepted),
-    "AH_SOCKET_ACCEPTED_SIZE does not match the size of 'ah_socket'");
+_Static_assert(sizeof(ah_socket) == sizeof(ah_socket_accepted),
+               "AH_SOCKET_ACCEPTED_SIZE does not match the internal size");
 
 ah_socket* span_get_socket(ah_server* server, size_t index)
 {
@@ -285,7 +277,7 @@ static ah_socket_slot listen_on_socket(ah_socket_slot slot)
 
 static ah_socket make_socket(ah_context* context)
 {
-  return (ah_socket) {.socket = INVALID_SOCKET, .context = context};
+  return (ah_socket) {INVALID_SOCKET, context};
 }
 
 bool create_socket(ah_socket* result_socket, ah_context* context, uint16_t port)
@@ -368,15 +360,16 @@ bool destroy_socket_accepted(ah_socket_accepted* socket)
 #define ADDRESS_LENGTH ((DWORD)(sizeof(SOCKADDR_IN) + 16))
 
 typedef struct ah_acceptor {
+  ah_overlapped_base base;
   ah_socket listening_socket;
+  ah_on_accept on_accept;
   ah_socket socket;
   uint8_t output_buffer[ADDRESS_LENGTH * 2];
 } ah_acceptor;
 
 static ah_acceptor* acceptor_from_overlapped(LPOVERLAPPED overlapped)
 {
-  return parentof(
-      socket_from_overlapped(overlapped), ah_acceptor, listening_socket);
+  return parentof(base_from_overlapped(overlapped), ah_acceptor, base);
 }
 
 size_t acceptor_size()
@@ -384,17 +377,11 @@ size_t acceptor_size()
   return sizeof(ah_acceptor);
 }
 
-static ah_on_accept on_accept_from_acceptor(ah_acceptor* acceptor)
-{
-  return (ah_on_accept)acceptor->listening_socket.on_complete;
-}
-
 static bool accept_on_error(ah_acceptor* acceptor, int error_code)
 {
-  ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
   ah_context* context = acceptor->listening_socket.context;
-  ah_socket_slot slot = {false, {.context = context}};
-  return on_accept(
+  ah_socket_slot slot = {false, make_socket(context)};
+  return acceptor->on_accept(
       (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
 }
 
@@ -411,8 +398,6 @@ static bool accept_error_handler(ah_acceptor* acceptor,
 }
 
 static bool do_accept(LPOVERLAPPED overlapped);
-
-static bool io_handler(LPOVERLAPPED overlapped);
 
 static bool accept_handler(LPOVERLAPPED overlapped)
 {
@@ -434,7 +419,6 @@ static bool accept_handler(LPOVERLAPPED overlapped)
       return accept_error_handler(
           acceptor, "CreateIoCompletionPort", error_code);
     }
-    slot.socket.base.handler = io_handler;
     acceptor->socket = slot.socket;
   }
 
@@ -459,8 +443,7 @@ static bool accept_handler(LPOVERLAPPED overlapped)
       ntohs(remote_address->sin_port),
   };
   ah_socket_slot slot = {true, acceptor->socket};
-  ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
-  bool result = on_accept(AH_ERR_OK, &slot.socket, address);
+  bool result = acceptor->on_accept(AH_ERR_OK, &slot.socket, address);
   /* If ownership of the socket wasn't taken by the handler, then it gets
    * destroyed */
   if (slot.ok) {
@@ -522,21 +505,20 @@ static bool do_accept(LPOVERLAPPED overlapped)
         return false;
       }
 
-      ah_on_accept on_accept = on_accept_from_acceptor(acceptor);
-      ah_socket_slot slot = {false, {.context = context}};
-      bool result = on_accept(
+      ah_socket_slot slot = {false, make_socket(context)};
+      bool result = acceptor->on_accept(
           (ah_error_code)error_code, &slot.socket, (ah_ipv4_address) {0});
       result = destroy_socket(&acceptor->socket) && result;
       if (!result) {
         return false;
       }
 
-      acceptor->listening_socket.base.handler = do_accept;
+      acceptor->base.handler = do_accept;
       return queue_overlapped(context->server->completion_port, overlapped);
     }
   }
 
-  acceptor->listening_socket.base.handler = accept_handler;
+  acceptor->base.handler = accept_handler;
   return true;
 }
 
@@ -544,9 +526,8 @@ bool create_acceptor(ah_acceptor* result_acceptor,
                      ah_socket* listening_socket,
                      ah_on_accept on_accept)
 {
-  *result_acceptor = (ah_acceptor) {.listening_socket = *listening_socket};
-  result_acceptor->listening_socket.on_complete = (void*)on_accept;
-  return do_accept(&result_acceptor->listening_socket.base.overlapped);
+  *result_acceptor = (ah_acceptor) {.base = {0}, *listening_socket, on_accept};
+  return do_accept(&result_acceptor->base.overlapped);
 }
 
 /* I/O */
@@ -560,41 +541,96 @@ void move_socket(ah_socket_accepted* result_socket, ah_socket* socket)
   }
 }
 
+typedef struct ah_io_port {
+  bool active;
+  bool is_read_port;
+  uint32_t buffer_length;
+  void* buffer;
+  ah_on_io_complete on_complete;
+  ah_overlapped_base base;
+} ah_io_port;
+
+_Static_assert(sizeof(ah_io_port) == sizeof(ah_io_operation),
+               "AH_IO_OPERATION_SIZE does not match the internal size");
+
+bool is_io_operation_active(ah_io_operation* operation)
+{
+  return ((ah_io_port*)operation)->active;
+}
+
+ah_io_buffer buffer_from_io_operation(ah_io_operation* operation)
+{
+  ah_io_port* port = (ah_io_port*)operation;
+  return (ah_io_buffer) {port->buffer_length, port->buffer};
+}
+
+ah_io_dock* dock_from_operation(ah_io_operation* operation)
+{
+  ah_io_port* port = (ah_io_port*)operation;
+  return port->is_read_port ? parentof(port, ah_io_dock, read_port)
+                            : parentof(port, ah_io_dock, write_port);
+}
+
+static ah_io_port* port_from_overlapped(LPOVERLAPPED overlapped)
+{
+  return parentof(base_from_overlapped(overlapped), ah_io_port, base);
+}
+
 static bool io_handler(LPOVERLAPPED overlapped)
 {
-  ah_socket* socket = socket_from_overlapped(overlapped);
+  ah_io_port* port = port_from_overlapped(overlapped);
   uint32_t bytes_transferred = overlapped->OffsetHigh;
   ah_error_code error_code = (ah_error_code)(int)overlapped->Offset;
 
-  ah_on_io_complete on_complete = (ah_on_io_complete)socket->on_complete;
-  return on_complete(
-      error_code, (ah_socket_accepted*)socket, bytes_transferred);
+  port->active = false;
+  return port->on_complete(
+      error_code, (ah_io_operation*)port, bytes_transferred);
 }
 
-bool queue_read_operation(ah_socket_accepted* accepted_socket,
-                          void* output_buffer,
-                          uint32_t buffer_length,
+static void init_io_port(ah_io_port* port,
+                         bool is_read_port,
+                         ah_io_buffer buffer,
+                         ah_on_io_complete on_complete)
+{
+  ah_io_port new_port = {
+      .active = true,
+      is_read_port,
+      buffer.buffer_length,
+      buffer.buffer,
+      on_complete,
+      .base = {.handler = io_handler},
+  };
+  memcpy(port, &new_port, sizeof(ah_io_port));
+}
+
+bool queue_read_operation(ah_io_dock* dock,
+                          ah_io_buffer buffer,
                           ah_on_io_complete on_complete)
 {
-  if (buffer_length > (uint32_t)INT32_MAX) {
+  if (buffer.buffer_length > (uint32_t)INT32_MAX) {
     return false;
   }
 
-  ah_socket* socket = (ah_socket*)accepted_socket;
-  socket->on_complete = (void*)on_complete;
+  ah_io_port* port = (ah_io_port*)&dock->read_port;
+  if (port->active) {
+    return false;
+  }
 
-  LPOVERLAPPED overlapped = &socket->base.overlapped;
-  clear_overlapped(overlapped);
+  init_io_port(port, true, buffer, on_complete);
 
-  WSABUF buffer = {buffer_length, output_buffer};
+  ah_socket* socket = (ah_socket*)dock->socket;
+  LPOVERLAPPED overlapped = &port->base.overlapped;
+  WSABUF wsa_buffer = {buffer.buffer_length, buffer.buffer};
   DWORD flags = 0;
   int result =
-      WSARecv(socket->socket, &buffer, 1, NULL, &flags, overlapped, NULL);
+      WSARecv(socket->socket, &wsa_buffer, 1, NULL, &flags, overlapped, NULL);
   if (result == SOCKET_ERROR) {
     int error_code = map_error_code(WSAGetLastError());
     if (error_code != WSA_IO_PENDING) {
       if (is_ah_error_code(error_code)) {
-        return on_complete((ah_error_code)error_code, accepted_socket, 0);
+        port->active = false;
+        return on_complete(
+            (ah_error_code)error_code, (ah_io_operation*)port, 0);
       }
 
       print_error("WSARecv", error_code);
@@ -605,28 +641,33 @@ bool queue_read_operation(ah_socket_accepted* accepted_socket,
   return true;
 }
 
-bool queue_write_operation(ah_socket_accepted* accepted_socket,
-                           void* input_buffer,
-                           uint32_t buffer_length,
+bool queue_write_operation(ah_io_dock* dock,
+                           ah_io_buffer buffer,
                            ah_on_io_complete on_complete)
 {
-  if (buffer_length > (uint32_t)INT32_MAX) {
+  if (buffer.buffer_length > (uint32_t)INT32_MAX) {
     return false;
   }
 
-  ah_socket* socket = (ah_socket*)accepted_socket;
-  socket->on_complete = (void*)on_complete;
+  ah_io_port* port = (ah_io_port*)&dock->write_port;
+  if (port->active) {
+    return false;
+  }
 
-  LPOVERLAPPED overlapped = &socket->base.overlapped;
-  clear_overlapped(overlapped);
+  init_io_port(port, false, buffer, on_complete);
 
-  WSABUF buffer = {buffer_length, input_buffer};
-  int result = WSASend(socket->socket, &buffer, 1, NULL, 0, overlapped, NULL);
+  ah_socket* socket = (ah_socket*)dock->socket;
+  LPOVERLAPPED overlapped = &port->base.overlapped;
+  WSABUF wsa_buffer = {buffer.buffer_length, buffer.buffer};
+  int result =
+      WSASend(socket->socket, &wsa_buffer, 1, NULL, 0, overlapped, NULL);
   if (result == SOCKET_ERROR) {
     int error_code = map_error_code(WSAGetLastError());
     if (error_code != WSA_IO_PENDING) {
       if (is_ah_error_code(error_code)) {
-        return on_complete((ah_error_code)error_code, accepted_socket, 0);
+        port->active = false;
+        return on_complete(
+            (ah_error_code)error_code, (ah_io_operation*)port, 0);
       }
 
       print_error("WSASend", error_code);
