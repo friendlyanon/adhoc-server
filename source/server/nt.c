@@ -405,7 +405,9 @@ static bool accept_handler(LPOVERLAPPED overlapped)
   {
     int error_code = (int)overlapped->Offset;
     if (error_code != 0) {
-      return accept_on_error(acceptor, error_code);
+      bool result = destroy_socket(&acceptor->socket);
+      result = accept_on_error(acceptor, error_code) && result;
+      return result;
     }
   }
 
@@ -416,8 +418,11 @@ static bool accept_handler(LPOVERLAPPED overlapped)
                         acceptor->listening_socket.context,
                         &error_code);
     if (!slot.ok) {
-      return accept_error_handler(
-          acceptor, "CreateIoCompletionPort", error_code);
+      bool result = destroy_socket(&slot.socket);
+      result =
+          accept_error_handler(acceptor, "CreateIoCompletionPort", error_code)
+          && result;
+      return result;
     }
     acceptor->socket = slot.socket;
   }

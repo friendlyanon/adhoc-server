@@ -353,7 +353,9 @@ static bool accept_handler(ah_acceptor* acceptor)
   };
   slot = socket_set_nonblocking(slot, AH_NONBLOCKING, false);
   if (!slot.ok) {
-    return accept_error_handler(context, on_accept, "fcntl");
+    bool result = destroy_socket(&slot.socket);
+    result = accept_error_handler(context, on_accept, "fcntl") && result;
+    return result;
   }
 
   uint32_t address_raw = ntohl(remote_address.sin_addr.s_addr);
