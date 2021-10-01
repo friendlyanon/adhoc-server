@@ -64,7 +64,8 @@ typedef bool (*ah_on_accept)(ah_error_code error_code,
  */
 typedef bool (*ah_on_io_complete)(ah_error_code error_code,
                                   ah_io_operation* operation,
-                                  uint32_t bytes_transferred);
+                                  uint32_t bytes_transferred,
+                                  void* per_call_data);
 
 /**
  * @brief Returns the size of the buffer to be allocated for ::create_server.
@@ -205,7 +206,8 @@ ah_io_dock* dock_from_operation(ah_io_operation* operation);
  */
 bool queue_read_operation(ah_io_dock* dock,
                           ah_io_buffer buffer,
-                          ah_on_io_complete on_complete);
+                          ah_on_io_complete on_complete,
+                          void* per_call_data);
 
 /**
  * @brief Queues a write operation from the provided buffer.
@@ -217,4 +219,5 @@ bool queue_read_operation(ah_io_dock* dock,
  */
 bool queue_write_operation(ah_io_dock* dock,
                            ah_io_buffer buffer,
-                           ah_on_io_complete on_complete);
+                           ah_on_io_complete on_complete,
+                           void* per_call_data);

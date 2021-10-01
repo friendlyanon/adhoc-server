@@ -50,9 +50,11 @@ static bool finish_session(io_session* session)
 
 static bool coroutine(ah_error_code error_code,
                       ah_io_operation* operation,
-                      uint32_t bytes_transferred)
+                      uint32_t bytes_transferred,
+                      void* per_call_data)
 {
   (void)error_code;
+  (void)per_call_data;
 
   ah_io_dock* dock = dock_from_operation(operation);
   io_session* session = (io_session*)dock;
@@ -68,7 +70,8 @@ static bool coroutine(ah_error_code error_code,
         return queue_write_operation(
             dock,
             (ah_io_buffer) {session->bytes_read, session->buffer},
-            coroutine);
+            coroutine,
+            NULL);
       }
       break;
     }
@@ -80,6 +83,7 @@ static bool coroutine(ah_error_code error_code,
 }
 
 #define BUFFER_FROM_STR(str) ((ah_io_buffer) {sizeof(str) - 1, (str)})
+#define BUFFER_FROM_ARR(arr) ((ah_io_buffer) {sizeof(arr), (arr)})
 
 static bool on_accept(ah_error_code error_code,
                       ah_socket* socket,
@@ -104,11 +108,9 @@ static bool on_accept(ah_error_code error_code,
   session->address = address;
 
   return queue_write_operation(
-             &session->dock, BUFFER_FROM_STR("Accepted\r\n"), coroutine)
+             &session->dock, BUFFER_FROM_STR("Accepted\r\n"), coroutine, NULL)
       && queue_read_operation(
-             &session->dock,
-             (ah_io_buffer) {sizeof(session->buffer), session->buffer},
-             coroutine);
+             &session->dock, BUFFER_FROM_ARR(session->buffer), coroutine, NULL);
 }
 
 library create_library()

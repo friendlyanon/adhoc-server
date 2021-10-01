@@ -429,6 +429,7 @@ typedef struct ah_io_port {
   uint32_t buffer_length;
   void* buffer;
   ah_on_io_complete on_complete;
+  void* per_call_data;
 } ah_io_port;
 
 _Static_assert(sizeof(ah_io_port) == sizeof(ah_io_operation),
@@ -474,7 +475,8 @@ static bool register_io_socket(ah_io_dock* dock, uint32_t events)
 static void init_io_port(ah_io_port* port,
                          bool is_read_port,
                          ah_io_buffer buffer,
-                         ah_on_io_complete on_complete)
+                         ah_on_io_complete on_complete,
+                         void* per_call_data)
 {
   ah_io_port new_port = {
       .active = true,
@@ -482,6 +484,7 @@ static void init_io_port(ah_io_port* port,
       buffer.buffer_length,
       buffer.buffer,
       on_complete,
+      per_call_data,
   };
   memcpy(port, &new_port, sizeof(ah_io_port));
 }
@@ -507,21 +510,23 @@ static bool read_handler(ah_socket* socket, ah_io_port* port)
     bytes_transferred = 0;
   }
 
-  return port->on_complete((ah_error_code)error_code,
-                           (ah_io_operation*)port,
-                           (uint32_t)bytes_transferred);
+  ah_error_code ec = (ah_error_code)error_code;
+  ah_io_operation* op = (ah_io_operation*)port;
+  return port->on_complete(
+      ec, op, (uint32_t)bytes_transferred, port->per_call_data);
 }
 
 bool queue_read_operation(ah_io_dock* dock,
                           ah_io_buffer buffer,
-                          ah_on_io_complete on_complete)
+                          ah_on_io_complete on_complete,
+                          void* per_call_data)
 {
   ah_io_port* port = (ah_io_port*)&dock->read_port;
   if (buffer.buffer_length > (uint32_t)INT32_MAX || port->active) {
     return false;
   }
 
-  init_io_port(port, true, buffer, on_complete);
+  init_io_port(port, true, buffer, on_complete, per_call_data);
 
   uint32_t events = EPOLLIN;
   if (((ah_io_port*)&dock->write_port)->active) {
@@ -552,21 +557,23 @@ static bool write_handler(ah_socket* socket, ah_io_port* port)
     bytes_transferred = 0;
   }
 
-  return port->on_complete((ah_error_code)error_code,
-                           (ah_io_operation*)port,
-                           (uint32_t)bytes_transferred);
+  ah_error_code ec = (ah_error_code)error_code;
+  ah_io_operation* op = (ah_io_operation*)port;
+  return port->on_complete(
+      ec, op, (uint32_t)bytes_transferred, port->per_call_data);
 }
 
 bool queue_write_operation(ah_io_dock* dock,
                            ah_io_buffer buffer,
-                           ah_on_io_complete on_complete)
+                           ah_on_io_complete on_complete,
+                           void* per_call_data)
 {
   ah_io_port* port = (ah_io_port*)&dock->write_port;
   if (buffer.buffer_length > (uint32_t)INT32_MAX || port->active) {
     return false;
   }
 
-  init_io_port(port, false, buffer, on_complete);
+  init_io_port(port, false, buffer, on_complete, per_call_data);
 
   uint32_t events = EPOLLOUT;
   if (((ah_io_port*)&dock->read_port)->active) {
