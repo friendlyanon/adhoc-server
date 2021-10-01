@@ -20,19 +20,15 @@ static void* ez_malloc(size_t size)
 
 typedef struct io_session {
   ah_io_dock dock;
+  size_t state;
   ah_socket_accepted socket;
   ah_ipv4_address address;
+  uint32_t bytes_read;
   uint8_t buffer[KILOBYTES(8)];
 } io_session;
 
-static bool on_write_complete(ah_error_code error_code,
-                              ah_io_operation* operation,
-                              uint32_t bytes_transferred)
+static bool finish_session(io_session* session)
 {
-  (void)error_code;
-  (void)bytes_transferred;
-
-  io_session* session = (io_session*)dock_from_operation(operation);
   ah_socket_accepted* socket = &session->socket;
 
   bool* stop_server = context_from_socket(socket)->user_data;
@@ -52,20 +48,38 @@ static bool on_write_complete(ah_error_code error_code,
   return result;
 }
 
-static bool on_read_complete(ah_error_code error_code,
-                             ah_io_operation* operation,
-                             uint32_t bytes_transferred)
+static bool coroutine(ah_error_code error_code,
+                      ah_io_operation* operation,
+                      uint32_t bytes_transferred)
 {
   (void)error_code;
 
-  ah_io_buffer buffer = buffer_from_io_operation(operation);
+  ah_io_dock* dock = dock_from_operation(operation);
+  io_session* session = (io_session*)dock;
+  switch (session->state++) {
+    case 0:
+      /* fallthrough */
+    case 1: {
+      if (operation == &dock->read_port) {
+        session->bytes_read = bytes_transferred;
+        fwrite(session->buffer, 1, bytes_transferred, stdout);
+      }
+      if (session->state == 2) {
+        return queue_write_operation(
+            dock,
+            (ah_io_buffer) {session->bytes_read, session->buffer},
+            coroutine);
+      }
+      break;
+    }
+    case 2:
+      return finish_session(session);
+  }
 
-  fwrite(buffer.buffer, 1, bytes_transferred, stdout);
-
-  buffer.buffer_length = bytes_transferred;
-  return queue_write_operation(
-      dock_from_operation(operation), buffer, on_write_complete);
+  return true;
 }
+
+#define BUFFER_FROM_STR(str) ((ah_io_buffer) {sizeof(str) - 1, (str)})
 
 static bool on_accept(ah_error_code error_code,
                       ah_socket* socket,
@@ -89,10 +103,12 @@ static bool on_accept(ah_error_code error_code,
   session->dock.socket = &session->socket;
   session->address = address;
 
-  return queue_read_operation(
-      &session->dock,
-      (ah_io_buffer) {sizeof(session->buffer), session->buffer},
-      on_read_complete);
+  return queue_write_operation(
+             &session->dock, BUFFER_FROM_STR("Accepted\r\n"), coroutine)
+      && queue_read_operation(
+             &session->dock,
+             (ah_io_buffer) {sizeof(session->buffer), session->buffer},
+             coroutine);
 }
 
 library create_library()
