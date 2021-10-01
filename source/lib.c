@@ -67,11 +67,8 @@ static bool coroutine(ah_error_code error_code,
         fwrite(session->buffer, 1, bytes_transferred, stdout);
       }
       if (session->state == 2) {
-        return queue_write_operation(
-            dock,
-            (ah_io_buffer) {session->bytes_read, session->buffer},
-            coroutine,
-            NULL);
+        ah_io_buffer buffer = {session->bytes_read, session->buffer};
+        return queue_write_operation(dock, buffer, coroutine);
       }
       break;
     }
@@ -108,9 +105,9 @@ static bool on_accept(ah_error_code error_code,
   session->address = address;
 
   return queue_write_operation(
-             &session->dock, BUFFER_FROM_STR("Accepted\r\n"), coroutine, NULL)
+             &session->dock, BUFFER_FROM_STR("Accepted\r\n"), coroutine)
       && queue_read_operation(
-             &session->dock, BUFFER_FROM_ARR(session->buffer), coroutine, NULL);
+             &session->dock, BUFFER_FROM_ARR(session->buffer), coroutine);
 }
 
 library create_library()

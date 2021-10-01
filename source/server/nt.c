@@ -616,10 +616,10 @@ static void init_io_port(ah_io_port* port,
   memcpy(port, &new_port, sizeof(ah_io_port));
 }
 
-bool queue_read_operation(ah_io_dock* dock,
-                          ah_io_buffer buffer,
-                          ah_on_io_complete on_complete,
-                          void* per_call_data)
+bool queue_read_operation4(ah_io_dock* dock,
+                           ah_io_buffer buffer,
+                           ah_on_io_complete on_complete,
+                           void* per_call_data)
 {
   ah_io_port* port = (ah_io_port*)&dock->read_port;
   if (buffer.buffer_length > (uint32_t)INT32_MAX || port->active) {
@@ -651,10 +651,10 @@ bool queue_read_operation(ah_io_dock* dock,
   return true;
 }
 
-bool queue_write_operation(ah_io_dock* dock,
-                           ah_io_buffer buffer,
-                           ah_on_io_complete on_complete,
-                           void* per_call_data)
+bool queue_write_operation4(ah_io_dock* dock,
+                            ah_io_buffer buffer,
+                            ah_on_io_complete on_complete,
+                            void* per_call_data)
 {
   ah_io_port* port = (ah_io_port*)&dock->write_port;
   if (buffer.buffer_length > (uint32_t)INT32_MAX || port->active) {

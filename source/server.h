@@ -200,24 +200,62 @@ ah_io_dock* dock_from_operation(ah_io_operation* operation);
  * @brief Queues a read operation into the provided buffer.
  *
  * The buffer must stay alive for the duration of the operation. The provided
- * \c buffer_length MUST NOT be greater than \c INT32_MAX (2147483647). The
+ * buffer's length MUST NOT be greater than \c INT32_MAX (2147483647). The
  * callback will also not receive a value greater than that for the number of
  * bytes transferred.
  */
-bool queue_read_operation(ah_io_dock* dock,
-                          ah_io_buffer buffer,
-                          ah_on_io_complete on_complete,
-                          void* per_call_data);
+bool queue_read_operation4(ah_io_dock* dock,
+                           ah_io_buffer buffer,
+                           ah_on_io_complete on_complete,
+                           void* per_call_data);
 
 /**
  * @brief Queues a write operation from the provided buffer.
  *
  * The buffer must stay alive for the duration of the operation. The provided
- * \c buffer_length MUST NOT be greater than \c INT32_MAX (2147483647). The
+ * buffer's length MUST NOT be greater than \c INT32_MAX (2147483647). The
  * callback will also not receive a value greater than that for the number of
  * bytes transferred.
  */
-bool queue_write_operation(ah_io_dock* dock,
-                           ah_io_buffer buffer,
-                           ah_on_io_complete on_complete,
-                           void* per_call_data);
+bool queue_write_operation4(ah_io_dock* dock,
+                            ah_io_buffer buffer,
+                            ah_on_io_complete on_complete,
+                            void* per_call_data);
+
+/**
+ * @brief Dispatches to ::queue_read_operation4 with the 4th argument as
+ * \c NULL.
+ */
+#define queue_read_operation3(x, y, z) queue_read_operation4(x, y, z, NULL)
+
+/**
+ * @brief Dispatches to ::queue_write_operation4 with the 4th argument as
+ * \c NULL.
+ */
+#define queue_write_operation3(x, y, z) queue_write_operation4(x, y, z, NULL)
+
+#define AH__CONCAT_IMPL(x, y) x##y
+
+#define AH__CONCAT(x, y) AH__CONCAT_IMPL(x, y)
+
+#define AH__COUNT_AUX(_1, _2, _3, _4, x, ...) x
+
+#define AH__COUNT(...) AH__COUNT_AUX(__VA_ARGS__, 4, 3, 2, 1, ~)
+
+/**
+ * @brief Dispatches to #queue_read_operation3 or ::queue_read_operation4 based
+ * on the number of arguments.
+ *
+ * @note The arguments may be evaluated multiple times.
+ */
+#define queue_read_operation(...) \
+  AH__CONCAT(queue_read_operation, AH__COUNT(__VA_ARGS__))(__VA_ARGS__)
+
+/**
+ * @brief Dispatches to #queue_write_operation3 or ::queue_write_operation4
+ * based on the number of arguments.
+ *
+ * @note The arguments may be evaluated multiple times.
+ */
+#define queue_write_operation(...) \
+  AH__CONCAT(queue_write_operation, AH__COUNT(__VA_ARGS__))(__VA_ARGS__)
