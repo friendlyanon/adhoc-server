@@ -50,7 +50,7 @@ set(
     CACHE STRING "The size of the ah_socket_accepted struct"
 )
 set(
-    adhoc-server_AH_SOCKET_ACCEPTED_ALIGNMENT 8
+    adhoc-server_AH_SOCKET_ACCEPTED_ALIGNMENT "${CMAKE_SIZEOF_VOID_P}"
     CACHE STRING "The alignment of the ah_socket_accepted struct"
 )
 set(
@@ -58,7 +58,7 @@ set(
     CACHE STRING "The size of the ah_io_operation struct"
 )
 set(
-    adhoc-server_AH_IO_OPERATION_ALIGNMENT 8
+    adhoc-server_AH_IO_OPERATION_ALIGNMENT "${CMAKE_SIZEOF_VOID_P}"
     CACHE STRING "The alignment of the ah_io_operation struct"
 )
 target_compile_definitions(
