@@ -149,6 +149,10 @@ typedef struct ah_socket {
   ah_context* context;
 } ah_socket;
 
+_Static_assert(
+    alignof(ah_socket) == alignof(ah_socket_accepted),
+    "AH_SOCKET_ACCEPTED_ALIGNMENT does not match the alignment of 'ah_socket'");
+
 _Static_assert(sizeof(ah_socket) == sizeof(ah_socket_accepted),
                "AH_SOCKET_ACCEPTED_SIZE does not match the internal size");
 
@@ -559,6 +563,10 @@ typedef struct ah_io_port {
   void* per_call_data;
   ah_overlapped_base base;
 } ah_io_port;
+
+_Static_assert(
+    alignof(ah_io_port) == alignof(ah_io_operation),
+    "AH_IO_OPERATION_ALIGNMENT does not match the internal alignment");
 
 _Static_assert(sizeof(ah_io_port) == sizeof(ah_io_operation),
                "AH_IO_OPERATION_SIZE does not match the internal size");

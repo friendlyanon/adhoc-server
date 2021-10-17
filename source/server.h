@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdalign.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -26,11 +27,12 @@ typedef struct ah_ipv4_address {
 } ah_ipv4_address;
 
 typedef struct ah_socket_accepted {
-  uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
+  alignas(
+      AH_SOCKET_ACCEPTED_ALIGNMENT) uint8_t reserved[AH_SOCKET_ACCEPTED_SIZE];
 } ah_socket_accepted;
 
 typedef struct ah_io_operation {
-  uint8_t reserved[AH_IO_OPERATION_SIZE];
+  alignas(AH_IO_OPERATION_ALIGNMENT) uint8_t reserved[AH_IO_OPERATION_SIZE];
 } ah_io_operation;
 
 typedef struct ah_io_dock {

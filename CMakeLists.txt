@@ -50,13 +50,23 @@ set(
     CACHE STRING "The size of the ah_socket_accepted struct"
 )
 set(
+    adhoc-server_AH_SOCKET_ACCEPTED_ALIGNMENT 8
+    CACHE STRING "The alignment of the ah_socket_accepted struct"
+)
+set(
     adhoc-server_AH_IO_OPERATION_SIZE "${ah_io_operation_size}"
     CACHE STRING "The size of the ah_io_operation struct"
+)
+set(
+    adhoc-server_AH_IO_OPERATION_ALIGNMENT 8
+    CACHE STRING "The alignment of the ah_io_operation struct"
 )
 target_compile_definitions(
     adhoc-server_server PUBLIC
     "AH_SOCKET_ACCEPTED_SIZE=${adhoc-server_AH_SOCKET_ACCEPTED_SIZE}"
+    "AH_SOCKET_ACCEPTED_ALIGNMENT=${adhoc-server_AH_SOCKET_ACCEPTED_ALIGNMENT}"
     "AH_IO_OPERATION_SIZE=${adhoc-server_AH_IO_OPERATION_SIZE}"
+    "AH_IO_OPERATION_ALIGNMENT=${adhoc-server_AH_IO_OPERATION_ALIGNMENT}"
 )
 
 set(
