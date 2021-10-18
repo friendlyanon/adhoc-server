@@ -66,7 +66,7 @@ size_t server_size()
 
 size_t server_alignment()
 {
-  return alignof(ah_server);
+  return _Alignof(ah_server);
 }
 
 static ah_server_slot startup(ah_server_slot slot)
@@ -155,7 +155,7 @@ typedef struct ah_socket {
 } ah_socket;
 
 _Static_assert(
-    alignof(ah_socket) == alignof(ah_socket_accepted),
+    _Alignof(ah_socket) == _Alignof(ah_socket_accepted),
     "AH_SOCKET_ACCEPTED_ALIGNMENT does not match the alignment of 'ah_socket'");
 
 _Static_assert(sizeof(ah_socket) == sizeof(ah_socket_accepted),
@@ -179,7 +179,7 @@ size_t socket_size()
 
 size_t socket_alignment()
 {
-  return alignof(ah_socket);
+  return _Alignof(ah_socket);
 }
 
 static ah_socket_slot create_unbound_socket(ah_socket_slot slot,
@@ -393,7 +393,7 @@ size_t acceptor_size()
 
 size_t acceptor_alignment()
 {
-  return alignof(ah_acceptor);
+  return _Alignof(ah_acceptor);
 }
 
 static bool accept_on_error(ah_acceptor* acceptor, int error_code)
@@ -580,7 +580,7 @@ typedef struct ah_io_port {
 } ah_io_port;
 
 _Static_assert(
-    alignof(ah_io_port) == alignof(ah_io_operation),
+    _Alignof(ah_io_port) == _Alignof(ah_io_operation),
     "AH_IO_OPERATION_ALIGNMENT does not match the internal alignment");
 
 _Static_assert(sizeof(ah_io_port) == sizeof(ah_io_operation),
