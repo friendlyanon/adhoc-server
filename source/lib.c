@@ -11,11 +11,18 @@
 static uint8_t ez_buffer[KILOBYTES(2)] = {0};
 static uint8_t* ez_buffer_pointer = ez_buffer;
 
-static void* ez_malloc(size_t size)
+static uint64_t next_multiple_of(uint64_t base, uint64_t multiple)
 {
-  uint8_t* pointer = ez_buffer_pointer;
-  ez_buffer_pointer += size;
-  return pointer;
+  return (base + multiple - 1) / multiple * multiple;
+}
+
+/* NOLINTNEXTLINE(bugprone-easily-swappable-parameters) */
+static void* ez_malloc(size_t size, size_t alignment)
+{
+  uint8_t* aligned_pointer =
+      (uint8_t*)next_multiple_of((uint64_t)ez_buffer_pointer, alignment);
+  ez_buffer_pointer = aligned_pointer + size;
+  return aligned_pointer;
 }
 
 typedef struct io_session {
@@ -112,13 +119,13 @@ static bool on_accept(ah_error_code error_code,
 
 library create_library()
 {
-  ah_server* server = ez_malloc(server_size());
+  ah_server* server = ez_malloc(server_size(), server_alignment());
   if (!create_server(server)) {
     goto exit;
   }
 
   bool stop_server = false;
-  ah_socket* socket = ez_malloc(socket_size());
+  ah_socket* socket = ez_malloc(socket_size(), socket_alignment());
   set_socket_span(server, (ah_socket_span) {1, socket});
   ah_context context = {server, &stop_server};
   {
@@ -128,7 +135,7 @@ library create_library()
     }
   }
 
-  ah_acceptor* acceptor = ez_malloc(acceptor_size());
+  ah_acceptor* acceptor = ez_malloc(acceptor_size(), acceptor_alignment());
   if (!create_acceptor(acceptor, socket, on_accept)) {
     goto exit;
   }

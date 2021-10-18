@@ -64,6 +64,11 @@ size_t server_size()
   return sizeof(ah_server);
 }
 
+size_t server_alignment()
+{
+  return alignof(ah_server);
+}
+
 static ah_server_slot startup(ah_server_slot slot)
 {
   if (!slot.ok) {
@@ -170,6 +175,11 @@ typedef struct ah_socket_slot {
 size_t socket_size()
 {
   return sizeof(ah_socket);
+}
+
+size_t socket_alignment()
+{
+  return alignof(ah_socket);
 }
 
 static ah_socket_slot create_unbound_socket(ah_socket_slot slot,
@@ -379,6 +389,11 @@ static ah_acceptor* acceptor_from_overlapped(LPOVERLAPPED overlapped)
 size_t acceptor_size()
 {
   return sizeof(ah_acceptor);
+}
+
+size_t acceptor_alignment()
+{
+  return alignof(ah_acceptor);
 }
 
 static bool accept_on_error(ah_acceptor* acceptor, int error_code)

@@ -70,9 +70,14 @@ typedef bool (*ah_on_io_complete)(ah_error_code error_code,
                                   void* per_call_data);
 
 /**
- * @brief Returns the size of the buffer to be allocated for ::create_server.
+ * @brief Returns the size of the ::ah_server object.
  */
 size_t server_size(void);
+
+/**
+ * @brief Returns the alignment of the ::ah_server object.
+ */
+size_t server_alignment(void);
 
 /**
  * @brief Creates the server and writes it out to the \c result_server buffer.
@@ -85,9 +90,14 @@ bool create_server(ah_server* result_server);
 bool destroy_server(ah_server* server);
 
 /**
- * @brief Returns the size of the buffer to be allocated for ::create_socket.
+ * @brief Returns the size of the ::ah_socket object.
  */
 size_t socket_size(void);
+
+/**
+ * @brief Returns the alignment of the ::ah_socket object.
+ */
+size_t socket_alignment(void);
 
 /**
  * @brief Creates a TCP/IPv4 socket bound to and listening on \c port.
@@ -130,9 +140,14 @@ void set_socket_span(ah_server* server, ah_socket_span span);
 ah_socket* span_get_socket(ah_server* server, size_t index);
 
 /**
- * @brief Returns the size of the buffer to be allocated for ::create_acceptor.
+ * @brief Returns the size of the ::ah_acceptor object.
  */
 size_t acceptor_size(void);
+
+/**
+ * @brief Returns the alignment of the ::ah_acceptor object.
+ */
+size_t acceptor_alignment(void);
 
 /**
  * @brief Creates an acceptor that queues an accept operation in the server.

@@ -26,6 +26,11 @@ size_t server_size()
   return sizeof(ah_server);
 }
 
+size_t server_alignment()
+{
+  return alignof(ah_server);
+}
+
 static bool set_close_on_exec(int descriptor, bool report)
 {
   int flags = fcntl(descriptor, F_GETFD);
@@ -110,6 +115,11 @@ typedef struct ah_socket_slot {
 size_t socket_size()
 {
   return sizeof(ah_socket);
+}
+
+size_t socket_alignment()
+{
+  return alignof(ah_socket);
 }
 
 static ah_socket_slot create_unbound_socket(ah_socket_slot slot)
@@ -318,6 +328,11 @@ typedef struct ah_acceptor {
 size_t acceptor_size()
 {
   return sizeof(ah_acceptor);
+}
+
+size_t acceptor_alignment()
+{
+  return alignof(ah_acceptor);
 }
 
 static bool accept_error_handler(ah_context* context,
