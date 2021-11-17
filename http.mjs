@@ -1,7 +1,18 @@
 import { createServer } from "http";
+import { MessageChannel } from "worker_threads";
 import { users } from "./users.mjs";
 
-const copyUsers = () => structuredClone(Array.from(users.entries()));
+function asyncStructuredClone(value) {
+  const { port1, port2 } = new MessageChannel();
+  return new Promise((resolve) => {
+    port2.on("message", resolve);
+    port2.on("close", () => port2.close);
+    port1.postMessage(value);
+    port1.close();
+  });
+}
+
+const asyncCopyUsers = () => asyncStructuredClone(Array.from(users.entries()));
 
 const asyncWrite = (res, data) => new Promise((resolve, reject) => {
   res.write(data, (error) => {
@@ -18,7 +29,7 @@ const asyncWrite = (res, data) => new Promise((resolve, reject) => {
  * @param {import("http").ServerResponse} res
  */
 async function onRequest(req, res) {
-  const copyOfUsers = copyUsers();
+  const copyOfUsers = await asyncCopyUsers();
   res.setHeader("content-type", "application/json");
   try {
     await asyncWrite(res, "{");
