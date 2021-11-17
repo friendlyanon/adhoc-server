@@ -6,13 +6,14 @@ import { users } from "./users.mjs";
  */
 function onConnection(connection) {
   const { remoteAddress } = connection;
+  const displayAddress = remoteAddress.padStart(15, " ");
   if (users.has(remoteAddress)) {
-    console.log("Duplicate connection from %s", remoteAddress);
+    console.log("%s - Duplicate connection", displayAddress);
     connection.end();
     return;
   }
 
-  console.log("New connection from %s", remoteAddress);
+  console.log("%s - New connection", displayAddress);
   const userState = {};
   users.set(remoteAddress, userState);
   connection.on("data", (chunk) => {
