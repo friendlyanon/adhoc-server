@@ -12,8 +12,8 @@ async function onRequest(req, res) {
   try {
     await asyncWrite(res, "{");
     let delimiter = "";
-    for (const [ip, user] of copyOfUsers) {
-      await asyncWrite(res, `${delimiter}"${ip}":`);
+    for (const { 0: ip, 1: user } of copyOfUsers) {
+      await asyncWrite(res, `${delimiter}${JSON.stringify(ip)}:`);
       await asyncWrite(res, JSON.stringify(user));
       delimiter = ","
     }

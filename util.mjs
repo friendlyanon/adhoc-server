@@ -1,5 +1,10 @@
 import { MessageChannel } from "worker_threads";
 
+/**
+ * @template T
+ * @param {T} value
+ * @returns {Promise<T>}
+ */
 export function asyncStructuredClone(value) {
   const { port1, port2 } = new MessageChannel();
   return new Promise((resolve) => {
@@ -15,7 +20,7 @@ export const asyncWrite = (stream, data) => new Promise((resolve, reject) => {
     if (error != null) {
       reject(error);
     } else {
-      resolve();
+      resolve(null);
     }
   });
 });

@@ -1,11 +1,16 @@
 import { createServer } from "net";
-import { users } from "./users.mjs";
+import { createUser, users } from "./users.mjs";
 
 /**
  * @param {import("net").Socket} connection
  */
 function onConnection(connection) {
   const { remoteAddress } = connection;
+  if (remoteAddress == null) {
+    connection.end();
+    return;
+  }
+
   const displayAddress = remoteAddress.padStart(15, " ");
   if (users.has(remoteAddress)) {
     console.log("%s - Duplicate connection", displayAddress);
@@ -14,7 +19,8 @@ function onConnection(connection) {
   }
 
   console.log("%s - New connection", displayAddress);
-  const userState = {};
+
+  const userState = createUser();
   users.set(remoteAddress, userState);
   const disconnectUser = () => {
     users.delete(remoteAddress);
