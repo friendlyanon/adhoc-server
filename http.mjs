@@ -1,15 +1,6 @@
 import { createServer } from "http";
 import { asyncCopyUsers } from "./users.mjs";
-
-const asyncWrite = (res, data) => new Promise((resolve, reject) => {
-  res.write(data, (error) => {
-    if (error != null) {
-      reject(error);
-    } else {
-      resolve();
-    }
-  });
-});
+import { asyncWrite } from "./util.mjs";
 
 /**
  * @param {import("http").IncomingMessage} req
