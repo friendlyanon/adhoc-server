@@ -16,9 +16,32 @@ function onConnection(connection) {
   console.log("%s - New connection", displayAddress);
   const userState = {};
   users.set(remoteAddress, userState);
+  const disconnectUser = () => {
+    users.delete(remoteAddress);
+    // TODO
+  };
+
   connection.on("data", (chunk) => {
     // TODO implement the adhoc server
   });
+
+  connection.setTimeout(15_000, () => connection.end());
+
+  const goodbye = () => {
+    console.log("%s - Goodbye", displayAddress);
+    disconnectUser();
+  };
+
+  connection.on("error", (error) => {
+    if (error.code === "ECONNRESET") {
+      return goodbye();
+    }
+
+    console.log("%s - Error", displayAddress);
+    disconnectUser();
+  });
+
+  connection.on("end", goodbye);
 }
 
 export const tcp = () => createServer(onConnection);
