@@ -3,10 +3,9 @@ import { createInterface } from "readline";
 import { http } from "./http.mjs";
 import { tcp } from "./tcp.mjs";
 
-if (process.platform === "win32") {
-  createInterface({ input: process.stdin })
-    .on("SIGINT", () => process.emit("SIGINT"));
-}
+const sigintSource = process.platform === "win32"
+  ? createInterface({ input: process.stdin })
+  : process;
 
 const parseArgs = ([tcpPort, httpPort]) => [
   parseInt(tcpPort, 10) || 27312,
@@ -18,7 +17,7 @@ const wrapError = (server) => new Promise((resolve) => {
 });
 
 const handleCtrlC = () => new Promise((resolve) => {
-  process.once("SIGINT", () => resolve(null));
+  sigintSource.once("SIGINT", () => resolve(null));
 });
 
 const listen = (server, name, port, signal) => new Promise((resolve) => {
