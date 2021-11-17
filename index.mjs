@@ -21,7 +21,7 @@ const handleCtrlC = () => new Promise((resolve) => {
 });
 
 const listen = (server, name, port, signal) => new Promise((resolve) => {
-  server.listen({ host: "localhost", port, signal }, () => {
+  server.listen({ host: "0.0.0.0", port, signal }, () => {
     console.log("%s server listening on port %d", name, port);
     resolve(null);
   });
