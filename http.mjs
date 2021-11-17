@@ -15,10 +15,11 @@ async function onRequest(req, res) {
     for (const { 0: ip, 1: user } of copyOfUsers) {
       await asyncWrite(res, `${delimiter}${JSON.stringify(ip)}:`);
       await asyncWrite(res, JSON.stringify(user));
-      delimiter = ","
+      delimiter = ",";
     }
     await asyncWrite(res, "}");
-  } catch {}
+  } catch {
+  }
   res.end();
 }
 
