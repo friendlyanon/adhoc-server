@@ -1,5 +1,5 @@
 import { createServer } from "http";
-import { asyncCopyUsers } from "./users.mjs";
+import { copyUsers } from "./users.mjs";
 import { asyncWrite } from "./util.mjs";
 
 /**
@@ -7,7 +7,7 @@ import { asyncWrite } from "./util.mjs";
  * @param {import("http").ServerResponse} res
  */
 async function onRequest(req, res) {
-  const copyOfUsers = await asyncCopyUsers();
+  const copyOfUsers = copyUsers();
   res.setHeader("content-type", "application/json");
   try {
     await asyncWrite(res, "{");

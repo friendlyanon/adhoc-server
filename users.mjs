@@ -1,5 +1,3 @@
-import { asyncStructuredClone } from "./util.mjs";
-
 /**
  * @typedef {object} User
  */
@@ -14,6 +12,6 @@ export const users = new Map();
 
 /** @typedef {{0: string, 1: User}} UserEntry */
 
-/** @returns {Promise<UserEntry[]>} */
-export const asyncCopyUsers = () =>
-  asyncStructuredClone(Array.from(users.entries()));
+/** @returns {UserEntry[]} */
+export const copyUsers = () =>
+  structuredClone(Array.from(users.entries()));
