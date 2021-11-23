@@ -1,4 +1,6 @@
 import { createServer } from "net";
+import * as opcodes from "./opcodes.mjs";
+import * as operations from "./operations.mjs";
 import { createUser, users } from "./users.mjs";
 
 /**
@@ -28,7 +30,20 @@ function onConnection(connection) {
   };
 
   connection.on("data", (chunk) => {
-    // TODO implement the adhoc server
+    const opcode = chunk[0];
+    if (!userState.loggedIn) {
+      if (opcode !== opcodes.LOGIN) {
+        console.log("%s - Invalid opcode %d in waiting state", displayAddress, opcode);
+        disconnectUser();
+      }
+      const error = operations.login(userState, chunk);
+      if (error != null) {
+        console.log("%s - %s", displayAddress, error);
+        disconnectUser();
+      }
+    } else {
+      // TODO
+    }
   });
 
   connection.setTimeout(15_000, () => connection.end());

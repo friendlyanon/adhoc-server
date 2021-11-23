@@ -1,9 +1,18 @@
 /**
  * @typedef {object} User
+ * @property {boolean} loggedIn
+ * @property {string|null} name
+ * @property {string|null} game
+ * @property {string|null} mac
  */
 
 /** @returns {User} */
-export const createUser = () => ({});
+export const createUser = () => ({
+  loggedIn: false,
+  name: null,
+  game: null,
+  mac: null,
+});
 
 /** @typedef {Map<string, User>} Users */
 
