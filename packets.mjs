@@ -1,4 +1,5 @@
 import * as opcodes from "./opcodes.mjs";
+import { ipToUint32 } from "./util.mjs";
 
 /**
  * @param {number} x
@@ -33,15 +34,6 @@ export const readLoginPacket = (chunk) => ({
 export const readConnectPacket = (chunk) => ({
   group: readName(chunk, 1, 8),
 });
-
-/**
- * @param {string} ip
- * @returns {number}
- */
-const ipToUint32 = (ip) => {
-  const [_1, _2, _3, _4] = ip.split(".").map(Number);
-  return _1 << 24 | _2 << 16 | _3 << 8 | _4;
-};
 
 /**
  * @param {Buffer} buffer
