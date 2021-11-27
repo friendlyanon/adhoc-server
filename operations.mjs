@@ -2,8 +2,8 @@ import { readLoginPacket } from "./packets.mjs";
 
 export const noop = () => {};
 
-const productCodeRe = /[A-Z0-9]{9}/;
-const macRe = /(?:[0-9a-f]{2}:){5}[0-9a-f]{2}/i;
+const productCodeRe = /^[A-Z0-9]{9}$/;
+const macRe = /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
 /**
  * @param userState
