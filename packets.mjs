@@ -24,3 +24,10 @@ export const readLoginPacket = (chunk) => ({
   name: readName(chunk, 7, 128),
   game: chunk.toString("ascii", 135, 144),
 });
+
+/**
+ * @param {Buffer} chunk
+ */
+export const readConnectPacket = (chunk) => ({
+  group: readName(chunk, 1, 8),
+});

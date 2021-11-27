@@ -4,6 +4,7 @@
  * @property {string|null} name
  * @property {string|null} game
  * @property {string|null} mac
+ * @property {string|null} group
  */
 
 /** @returns {User} */
@@ -12,6 +13,7 @@ export const createUser = () => ({
   name: null,
   game: null,
   mac: null,
+  group: null,
 });
 
 /** @typedef {Map<string, User>} Users */

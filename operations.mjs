@@ -1,4 +1,4 @@
-import { readLoginPacket } from "./packets.mjs";
+import { readConnectPacket, readLoginPacket } from "./packets.mjs";
 
 export const noop = () => {};
 
@@ -24,5 +24,27 @@ export function login(userState, chunk) {
   userState.name = loginPacket.name;
   userState.game = loginPacket.game;
   userState.mac = loginPacket.mac.toUpperCase();
+  return null;
+}
+
+const groupCodeRe = /^(?:[a-z]{,4}|[a-z]{4}\d{,4})$/i;
+
+/**
+ * @param userState
+ * @param {Buffer} chunk
+ * @returns {Promise<string|null>}
+ */
+export async function connect(userState, chunk) {
+  if (userState.group != null) {
+    return `User is already in the group ${userState.group}`;
+  }
+
+  const connectPacket = readConnectPacket(chunk);
+  if (!groupCodeRe.test(connectPacket.group)) {
+    return `Invalid group name ${connectPacket.group}`;
+  }
+
+  userState.group = connectPacket.group;
+  // TODO notify other group members
   return null;
 }

@@ -7,7 +7,7 @@ const todoHandler = () => Promise.resolve("Not implemented");
 
 const opcodeMap = new Map([
   [opcodes.PING, operations.noop],
-  [opcodes.CONNECT, todoHandler],
+  [opcodes.CONNECT, operations.connect],
   [opcodes.DISCONNECT, todoHandler],
   [opcodes.SCAN, todoHandler],
   [opcodes.SCAN_COMPLETE, todoHandler],
