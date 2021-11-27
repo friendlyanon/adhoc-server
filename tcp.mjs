@@ -3,7 +3,7 @@ import * as opcodes from "./opcodes.mjs";
 import * as operations from "./operations.mjs";
 import { createUser, users } from "./users.mjs";
 
-const todoHandler = () => "Not implemented";
+const todoHandler = () => Promise.resolve("Not implemented");
 
 const opcodeMap = new Map([
   [opcodes.PING, operations.noop],
@@ -36,9 +36,20 @@ function onConnection(connection) {
 
   const userState = createUser();
   users.set(remoteAddress, userState);
-  const disconnectUser = () => {
+  const disconnectUser = (error) => {
+    if (error != null) {
+      console.error(error);
+    }
+
     users.delete(remoteAddress);
     // TODO
+  };
+
+  const errorHandler = (error) => {
+    if (error != null) {
+      console.log("%s - %s", displayAddress, error);
+      disconnectUser();
+    }
   };
 
   connection.on("data", (chunk) => {
@@ -49,27 +60,20 @@ function onConnection(connection) {
     const opcode = chunk[0];
     if (!userState.loggedIn) {
       if (opcode !== opcodes.LOGIN) {
-        console.log("%s - Invalid opcode %d in waiting state", displayAddress, opcode);
-        disconnectUser();
+        return errorHandler(`Invalid opcode ${opcode} in waiting state`);
       }
       const error = operations.login(userState, chunk);
       if (error != null) {
-        console.log("%s - %s", displayAddress, error);
-        disconnectUser();
+        return errorHandler(error);
       }
     }
 
     const handler = opcodeMap.get(opcode);
     if (handler == null) {
-      console.log("%s - Invalid opcode %d in logged in state", displayAddress, opcode);
-      disconnectUser();
+      return errorHandler(`Invalid opcode ${opcode} in logged in state`);
     }
 
-    const error = handler(userState, chunk);
-    if (error != null) {
-      console.log("%s - %s", displayAddress, error);
-      disconnectUser();
-    }
+    handler(userState, chunk).then(errorHandler, disconnectUser);
   });
 
   connection.setTimeout(15_000, () => connection.end());
