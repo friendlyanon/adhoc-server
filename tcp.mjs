@@ -30,6 +30,10 @@ function onConnection(connection) {
   };
 
   connection.on("data", (chunk) => {
+    if (chunk.length === 0) {
+      return;
+    }
+
     const opcode = chunk[0];
     if (!userState.loggedIn) {
       if (opcode !== opcodes.LOGIN) {
