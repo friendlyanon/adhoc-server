@@ -7,6 +7,9 @@
  * @property {string|null} group
  */
 
+/** @type {Map<string, import("net").Socket>} */
+export const connections = new Map();
+
 /** @returns {User} */
 export const createUser = () => ({
   loggedIn: false,

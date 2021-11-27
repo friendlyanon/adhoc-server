@@ -1,3 +1,5 @@
+import * as opcodes from "./opcodes.mjs";
+
 /**
  * @param {number} x
  * @returns {string}
@@ -31,3 +33,37 @@ export const readLoginPacket = (chunk) => ({
 export const readConnectPacket = (chunk) => ({
   group: readName(chunk, 1, 8),
 });
+
+/**
+ * @param {string} ip
+ * @returns {number}
+ */
+const ipToUint32 = (ip) => {
+  const [_1, _2, _3, _4] = ip.split(".").map(Number);
+  return _1 << 24 | _2 << 16 | _3 << 8 | _4;
+};
+
+/**
+ * @param {Buffer} buffer
+ * @param {string} mac
+ * @param {number} offset
+ */
+const writeMac = (buffer, mac, offset) => {
+  for (const [i, byte] of mac.split(":").entries()) {
+    buffer.writeUInt8(parseInt(byte, 16), offset + i);
+  }
+};
+
+/**
+ * @param {UserEntry} entry
+ * @returns {Buffer}
+ */
+export const makeGroupJoinPacket = (entry) => {
+  const { 0: ip, 1: userState } = entry;
+  const result = Buffer.alloc(1 + 128 + 6 + 4);
+  result.writeUInt8(opcodes.CONNECT, 0);
+  result.write(userState.name, 1, "ascii");
+  writeMac(result, userState.mac, 129);
+  result.writeUInt32BE(ipToUint32(ip), 135);
+  return result;
+};

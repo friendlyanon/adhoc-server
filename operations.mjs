@@ -1,6 +1,9 @@
-import { readConnectPacket, readLoginPacket } from "./packets.mjs";
+import { makeGroupJoinPacket, readConnectPacket, readLoginPacket } from "./packets.mjs";
+import { connections, copyUsers } from "./users.mjs";
+import { asyncWrite } from "./util.mjs";
 
-export const noop = () => {};
+export const noop = () => {
+};
 
 const productCodeRe = /^[A-Z0-9]{9}$/;
 const macRe = /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
@@ -30,11 +33,12 @@ export function login(userState, chunk) {
 const groupCodeRe = /^(?:[a-z]{,4}|[a-z]{4}\d{,4})$/i;
 
 /**
+ * @param {import("net").Socket} connection
  * @param userState
  * @param {Buffer} chunk
  * @returns {Promise<string|null>}
  */
-export async function connect(userState, chunk) {
+export async function connect(connection, userState, chunk) {
   if (userState.group != null) {
     return `User is already in the group ${userState.group}`;
   }
@@ -44,7 +48,20 @@ export async function connect(userState, chunk) {
     return `Invalid group name ${connectPacket.group}`;
   }
 
-  userState.group = connectPacket.group;
-  // TODO notify other group members
+  const { group } = connectPacket;
+  const users = copyUsers();
+  const userEntry =
+    /** @type {UserEntry} */ [connection.remoteAddress, userState];
+  userState.group = group;
+  for (const entry of users) {
+    const { 0: ip, 1: peer } = entry;
+    if (peer.group === group) {
+      await Promise.all([
+        asyncWrite(connections.get(ip), makeGroupJoinPacket(userEntry)),
+        asyncWrite(connection, makeGroupJoinPacket(entry)),
+      ]);
+    }
+  }
+
   return null;
 }

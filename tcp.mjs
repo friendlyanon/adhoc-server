@@ -1,7 +1,7 @@
 import { createServer } from "net";
 import * as opcodes from "./opcodes.mjs";
 import * as operations from "./operations.mjs";
-import { createUser, users } from "./users.mjs";
+import { connections, createUser, users } from "./users.mjs";
 
 const todoHandler = () => Promise.resolve("Not implemented");
 
@@ -35,6 +35,7 @@ function onConnection(connection) {
   console.log("%s - New connection", displayAddress);
 
   const userState = createUser();
+  connections.set(remoteAddress, connection);
   users.set(remoteAddress, userState);
   const disconnectUser = (error) => {
     if (error != null) {
@@ -42,6 +43,7 @@ function onConnection(connection) {
     }
 
     users.delete(remoteAddress);
+    connections.delete(remoteAddress);
     // TODO
   };
 
@@ -73,7 +75,7 @@ function onConnection(connection) {
       return errorHandler(`Invalid opcode ${opcode} in logged in state`);
     }
 
-    handler(userState, chunk).then(errorHandler, disconnectUser);
+    handler(connection, userState, chunk).then(errorHandler, disconnectUser);
   });
 
   connection.setTimeout(15_000, () => connection.end());
