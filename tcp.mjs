@@ -6,7 +6,7 @@ import { createUser, users } from "./users.mjs";
 const todoHandler = () => "Not implemented";
 
 const opcodeMap = new Map([
-  [opcodes.PING, todoHandler],
+  [opcodes.PING, operations.noop],
   [opcodes.CONNECT, todoHandler],
   [opcodes.DISCONNECT, todoHandler],
   [opcodes.SCAN, todoHandler],
