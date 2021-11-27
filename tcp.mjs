@@ -3,6 +3,18 @@ import * as opcodes from "./opcodes.mjs";
 import * as operations from "./operations.mjs";
 import { createUser, users } from "./users.mjs";
 
+const todoHandler = () => "Not implemented";
+
+const opcodeMap = new Map([
+  [opcodes.PING, todoHandler],
+  [opcodes.CONNECT, todoHandler],
+  [opcodes.DISCONNECT, todoHandler],
+  [opcodes.SCAN, todoHandler],
+  [opcodes.SCAN_COMPLETE, todoHandler],
+  [opcodes.CONNECT_BSSID, todoHandler],
+  [opcodes.CHAT, todoHandler],
+]);
+
 /**
  * @param {import("net").Socket} connection
  */
@@ -45,8 +57,18 @@ function onConnection(connection) {
         console.log("%s - %s", displayAddress, error);
         disconnectUser();
       }
-    } else {
-      // TODO
+    }
+
+    const handler = opcodeMap.get(opcode);
+    if (handler == null) {
+      console.log("%s - Invalid opcode %d in logged in state", displayAddress, opcode);
+      disconnectUser();
+    }
+
+    const error = handler(userState, chunk);
+    if (error != null) {
+      console.log("%s - %s", displayAddress, error);
+      disconnectUser();
     }
   });
 
