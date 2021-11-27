@@ -1,6 +1,7 @@
+import * as opcodes from "./opcodes.mjs";
 import { makeGroupJoinPacket, readConnectPacket, readLoginPacket } from "./packets.mjs";
 import { connections, copyUsers } from "./users.mjs";
-import { asyncWrite } from "./util.mjs";
+import { asyncWrite, ipToUint32 } from "./util.mjs";
 
 export const noop = () => {
 };
@@ -9,7 +10,7 @@ const productCodeRe = /^[A-Z0-9]{9}$/;
 const macRe = /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
 /**
- * @param userState
+ * @param {User} userState
  * @param {Buffer} chunk
  * @returns {string|null}
  */
@@ -34,7 +35,7 @@ const groupCodeRe = /^(?:[a-z]{,4}|[a-z]{4}\d{,4})$/i;
 
 /**
  * @param {import("net").Socket} connection
- * @param userState
+ * @param {User} userState
  * @param {Buffer} chunk
  * @returns {Promise<string|null>}
  */
@@ -64,4 +65,30 @@ export async function connect(connection, userState, chunk) {
   }
 
   return null;
+}
+
+/**
+ * @param {import("net").Socket} connection
+ * @param {User} userState
+ * @returns {Promise<string|null>}
+ */
+export async function disconnect(connection, userState) {
+  if (userState.group == null) {
+    return "User is not in a group";
+  }
+
+  const userIp = connection.remoteAddress;
+  const packet = Buffer.allocUnsafe(5);
+  packet.writeUInt8(opcodes.DISCONNECT);
+  packet.writeUInt32BE(ipToUint32(userIp), 1);
+
+  const users = copyUsers();
+  const { group } = userState;
+  userState.group = null;
+
+  await Promise.all(users.flatMap(({ 0: ip, 1: peer }) => {
+    return ip !== userIp && peer.group === group
+      ? [asyncWrite(connections.get(ip), packet)]
+      : [];
+  }));
 }
