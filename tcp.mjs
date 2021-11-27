@@ -10,8 +10,6 @@ const opcodeMap = new Map([
   [opcodes.CONNECT, operations.connect],
   [opcodes.DISCONNECT, operations.disconnect],
   [opcodes.SCAN, todoHandler],
-  [opcodes.SCAN_COMPLETE, todoHandler],
-  [opcodes.CONNECT_BSSID, todoHandler],
   [opcodes.CHAT, todoHandler],
 ]);
 
