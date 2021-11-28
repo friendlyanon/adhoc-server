@@ -70,3 +70,16 @@ export const makeGroupLeavePacket = (ip) => {
   result.writeUInt32BE(ipToUint32(ip), 1);
   return result;
 };
+
+export const scanCompletePacket = Buffer.alloc(1, opcodes.SCAN_COMPLETE);
+
+/**
+ * @param {User} peer
+ */
+export const makeScanPacket = (peer) => {
+  const result = Buffer.allocUnsafe(16);
+  result.writeUInt8(opcodes.SCAN);
+  result.write(peer.group, 1, "ascii");
+  writeMac(result, peer.mac, 9);
+  return result;
+};

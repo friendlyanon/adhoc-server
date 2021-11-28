@@ -1,4 +1,11 @@
-import { makeGroupJoinPacket, makeGroupLeavePacket, readConnectPacket, readLoginPacket } from "./packets.mjs";
+import {
+  makeGroupJoinPacket,
+  makeGroupLeavePacket,
+  makeScanPacket,
+  readConnectPacket,
+  readLoginPacket,
+  scanCompletePacket,
+} from "./packets.mjs";
 import { connections, copyUsers } from "./users.mjs";
 import { asyncWrite } from "./util.mjs";
 
@@ -93,4 +100,30 @@ export async function disconnect(connection, userState) {
   const { game, group } = userState;
   userState.group = null;
   await leaveGroup(connection.remoteAddress, game, group);
+}
+
+const added = (set, value) => set.size !== set.add(value).size;
+
+const shouldSendScan = (userState, peer, game, seenGroups) =>
+  peer !== userState && peer.game === game && added(seenGroups, peer.group);
+
+/**
+ * @param {import("net").Socket} connection
+ * @param {User} userState
+ * @returns {Promise<string|null>}
+ */
+export async function scan(connection, userState) {
+  if (userState.group != null) {
+    return `User scanned when in group ${userState.group} for game ${userState.game}`;
+  }
+
+  const users = copyUsers();
+  const seenGroups = new Set();
+  const { game } = userState;
+  await Promise.all(users.flatMap(({ 1: peer }) => {
+    return shouldSendScan(userState, peer, game, seenGroups)
+      ? [asyncWrite(connection, makeScanPacket(peer))]
+      : [];
+  }));
+  await asyncWrite(connection, scanCompletePacket);
 }

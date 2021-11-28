@@ -9,7 +9,7 @@ const opcodeMap = new Map([
   [opcodes.PING, operations.noop],
   [opcodes.CONNECT, operations.connect],
   [opcodes.DISCONNECT, operations.disconnect],
-  [opcodes.SCAN, todoHandler],
+  [opcodes.SCAN, operations.scan],
   [opcodes.CHAT, todoHandler],
 ]);
 
