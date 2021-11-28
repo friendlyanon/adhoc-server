@@ -59,3 +59,14 @@ export const makeGroupJoinPacket = (entry) => {
   result.writeUInt32BE(ipToUint32(ip), 135);
   return result;
 };
+
+/**
+ * @param {string} ip
+ * @returns {Buffer}
+ */
+export const makeGroupLeavePacket = (ip) => {
+  const result = Buffer.allocUnsafe(5);
+  result.writeUInt8(opcodes.DISCONNECT);
+  result.writeUInt32BE(ipToUint32(ip), 1);
+  return result;
+};

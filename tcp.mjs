@@ -42,7 +42,10 @@ function onConnection(connection) {
 
     users.delete(remoteAddress);
     connections.delete(remoteAddress);
-    // TODO
+    const promise = userState.group != null
+      ? operations.leaveGroup(remoteAddress, userState.group)
+      : Promise.resolve(null);
+    promise.catch(console.error);
   };
 
   const errorHandler = (error) => {

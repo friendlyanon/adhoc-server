@@ -1,7 +1,6 @@
-import * as opcodes from "./opcodes.mjs";
-import { makeGroupJoinPacket, readConnectPacket, readLoginPacket } from "./packets.mjs";
+import { makeGroupJoinPacket, makeGroupLeavePacket, readConnectPacket, readLoginPacket } from "./packets.mjs";
 import { connections, copyUsers } from "./users.mjs";
-import { asyncWrite, ipToUint32 } from "./util.mjs";
+import { asyncWrite } from "./util.mjs";
 
 export const noop = () => {
 };
@@ -68,6 +67,19 @@ export async function connect(connection, userState, chunk) {
 }
 
 /**
+ * @param {string} userIp
+ * @param {string} group
+ */
+export async function leaveGroup(userIp, group) {
+  const packet = makeGroupLeavePacket(userIp);
+  for (const { 0: ip, 1: peer } of copyUsers()) {
+    if (ip !== userIp && peer.group === group) {
+      await asyncWrite(connections.get(ip), packet);
+    }
+  }
+}
+
+/**
  * @param {import("net").Socket} connection
  * @param {User} userState
  * @returns {Promise<string|null>}
@@ -77,18 +89,7 @@ export async function disconnect(connection, userState) {
     return "User is not in a group";
   }
 
-  const userIp = connection.remoteAddress;
-  const packet = Buffer.allocUnsafe(5);
-  packet.writeUInt8(opcodes.DISCONNECT);
-  packet.writeUInt32BE(ipToUint32(userIp), 1);
-
-  const users = copyUsers();
   const { group } = userState;
   userState.group = null;
-
-  await Promise.all(users.flatMap(({ 0: ip, 1: peer }) => {
-    return ip !== userIp && peer.group === group
-      ? [asyncWrite(connections.get(ip), packet)]
-      : [];
-  }));
+  await leaveGroup(connection.remoteAddress, group);
 }
