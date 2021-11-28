@@ -55,7 +55,7 @@ export async function connect(connection, userState, chunk) {
     return `Invalid group name ${connectPacket.group}`;
   }
 
-  const { group } = connectPacket;
+  const group = connectPacket.group.toUpperCase();
   const users = copyUsers();
   const userEntry =
     /** @type {UserEntry} */ [connection.remoteAddress, userState];
