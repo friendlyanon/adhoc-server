@@ -43,7 +43,7 @@ function onConnection(connection) {
     users.delete(remoteAddress);
     connections.delete(remoteAddress);
     const promise = userState.group != null
-      ? operations.leaveGroup(remoteAddress, userState.group)
+      ? operations.leaveGroup(remoteAddress, userState.game, userState.group)
       : Promise.resolve(null);
     promise.catch(console.error);
   };

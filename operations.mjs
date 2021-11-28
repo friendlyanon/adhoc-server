@@ -68,12 +68,13 @@ export async function connect(connection, userState, chunk) {
 
 /**
  * @param {string} userIp
+ * @param {string} game
  * @param {string} group
  */
-export async function leaveGroup(userIp, group) {
+export async function leaveGroup(userIp, game, group) {
   const packet = makeGroupLeavePacket(userIp);
   for (const { 0: ip, 1: peer } of copyUsers()) {
-    if (ip !== userIp && peer.group === group) {
+    if (ip !== userIp && peer.game === game && peer.group === group) {
       await asyncWrite(connections.get(ip), packet);
     }
   }
@@ -89,7 +90,7 @@ export async function disconnect(connection, userState) {
     return "User is not in a group";
   }
 
-  const { group } = userState;
+  const { game, group } = userState;
   userState.group = null;
-  await leaveGroup(connection.remoteAddress, group);
+  await leaveGroup(connection.remoteAddress, game, group);
 }
