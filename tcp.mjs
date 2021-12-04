@@ -66,13 +66,10 @@ function onConnection(connection) {
     }
 
     if (!userState.loggedIn) {
-      if (opcode !== opcodes.LOGIN) {
-        return errorHandler(`Invalid opcode ${opcode} in waiting state`);
-      }
-      const error = operations.login(userState, chunk);
-      if (error != null) {
-        return errorHandler(error);
-      }
+      const result = opcode === opcodes.LOGIN
+        ? operations.login(userState, chunk)
+        : `Invalid opcode ${opcode} in waiting state`;
+      return errorHandler(result);
     }
 
     const handler = opcodeMap.get(opcode);
