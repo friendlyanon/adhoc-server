@@ -3,7 +3,8 @@ import * as opcodes from "./opcodes.mjs";
 import * as operations from "./operations.mjs";
 import { connections, createUser, users } from "./users.mjs";
 
-const todoHandler = () => Promise.resolve("Not implemented");
+const todoHandler =
+  ((promise) => () => promise)(Promise.resolve("Not implemented"));
 
 const opcodeMap = new Map([
   [opcodes.PING, operations.noop],
