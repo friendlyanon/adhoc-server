@@ -35,7 +35,7 @@ export function login(userState, chunk) {
   return null;
 }
 
-const groupCodeRe = /^(?:[a-z]{,4}|[a-z]{4}\d{,4})$/i;
+const groupCodeRe = /^[a-z0-9]{0,8}$/i;
 
 /**
  * @param {import("net").Socket} connection
