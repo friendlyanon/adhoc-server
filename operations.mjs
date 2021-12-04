@@ -98,6 +98,8 @@ export async function disconnect(connection, userState) {
   const { game, group } = userState;
   userState.group = null;
   await leaveGroup(connection.remoteAddress, game, group);
+
+  return null;
 }
 
 const added = (set, value) => set.size !== set.add(value).size;
@@ -125,4 +127,6 @@ export async function scan(connection, userState) {
       : [];
   }));
   await asyncWrite(connection, scanCompletePacket);
+
+  return null;
 }
