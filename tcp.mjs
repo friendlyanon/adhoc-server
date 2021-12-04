@@ -7,7 +7,6 @@ const todoHandler =
   ((promise) => () => promise)(Promise.resolve("Not implemented"));
 
 const opcodeMap = new Map([
-  [opcodes.PING, operations.noop],
   [opcodes.CONNECT, operations.connect],
   [opcodes.DISCONNECT, operations.disconnect],
   [opcodes.SCAN, operations.scan],
@@ -62,6 +61,10 @@ function onConnection(connection) {
     }
 
     const opcode = chunk[0];
+    if (opcode === opcodes.PING) {
+      return;
+    }
+
     if (!userState.loggedIn) {
       if (opcode !== opcodes.LOGIN) {
         return errorHandler(`Invalid opcode ${opcode} in waiting state`);

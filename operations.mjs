@@ -9,8 +9,6 @@ import {
 import { connections, copyUsers } from "./users.mjs";
 import { asyncWrite } from "./util.mjs";
 
-export const noop = ((promise) => () => promise)(Promise.resolve());
-
 const productCodeRe = /^[A-Z0-9]{9}$/;
 const macRe = /^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$/i;
 
