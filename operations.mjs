@@ -31,6 +31,7 @@ export function login(userState, chunk) {
   if (!macRe.test(loginPacket.mac)) {
     return `Invalid MAC ${loginPacket.mac}`;
   }
+  userState.loggedIn = true;
   userState.name = loginPacket.name;
   userState.game = loginPacket.game;
   userState.mac = loginPacket.mac.toUpperCase();
