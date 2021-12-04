@@ -27,5 +27,7 @@ export const users = new Map();
 /** @typedef {{0: string, 1: User}} UserEntry */
 
 /** @returns {UserEntry[]} */
-export const copyUsers = () =>
-  structuredClone(Array.from(users.entries()));
+export const copyUsers = () => Array.from(users.entries(), (entry) => {
+  entry[1] = structuredClone(entry[1]);
+  return entry;
+});
