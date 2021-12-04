@@ -13,6 +13,9 @@ const opcodeMap = new Map([
   [opcodes.CHAT, todoHandler],
 ]);
 
+const opcodeString =
+  new Map(Object.entries(opcodes).map((entry) => entry.reverse()));
+
 /**
  * @param {import("net").Socket} connection
  */
@@ -65,6 +68,7 @@ function onConnection(connection) {
       return;
     }
 
+    console.log("%s - Opcode %d (%s)", displayAddress, opcode, opcodeString.get(opcode));
     if (!userState.loggedIn) {
       const result = opcode === opcodes.LOGIN
         ? operations.login(userState, chunk)
