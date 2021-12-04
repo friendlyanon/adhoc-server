@@ -102,8 +102,8 @@ export async function disconnect(connection, userState) {
 
 const added = (set, value) => set.size !== set.add(value).size;
 
-const shouldSendScan = (userState, peer, game, seenGroups) =>
-  peer !== userState && peer.game === game && added(seenGroups, peer.group);
+const shouldSendScan = (peer, game, seenGroups) =>
+  peer.game === game && added(seenGroups, peer.group);
 
 /**
  * @param {import("net").Socket} connection
@@ -117,9 +117,10 @@ export async function scan(connection, userState) {
 
   const users = copyUsers();
   const seenGroups = new Set();
+  const { remoteAddress } = connection;
   const { game } = userState;
-  await Promise.all(users.flatMap(({ 1: peer }) => {
-    return shouldSendScan(userState, peer, game, seenGroups)
+  await Promise.all(users.flatMap(({ 0: ip, 1: peer }) => {
+    return remoteAddress !== ip && shouldSendScan(peer, game, seenGroups)
       ? [asyncWrite(connection, makeScanPacket(peer))]
       : [];
   }));
